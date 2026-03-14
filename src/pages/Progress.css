@@ -1,0 +1,213 @@
+.progress-container {
+    padding: 24px;
+    min-height: 100vh;
+}
+
+/* Header */
+.progress-header {
+    margin-top: 10px;
+    margin-bottom: 24px;
+}
+
+.progress-header h1 {
+    font-size: 24px;
+    color: #123e42;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.progress-header p {
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+/* Stats Row */
+.stats-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.stat-card {
+    flex: 1;
+    border-radius: 20px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.orange-card {
+    background: linear-gradient(135deg, #fffbeb 0%, #ffedd5 100%);
+    border: 1px solid rgba(251, 146, 60, 0.2);
+}
+
+.blue-card {
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.stat-icon-wrapper {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.orange-icon {
+    background: #fed7aa;
+}
+
+.blue-icon {
+    background: #bfdbfe;
+}
+
+.stat-number {
+    font-size: 28px;
+    font-weight: 800;
+    margin-bottom: 4px;
+    line-height: 1;
+}
+
+.orange-card .stat-number {
+    color: #9a3412;
+}
+
+.blue-card .stat-number {
+    color: #1e40af;
+}
+
+.stat-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.orange-card .stat-label {
+    color: #ea580c;
+}
+
+.blue-card .stat-label {
+    color: #2563eb;
+}
+
+/* Average Mood Card */
+.avg-mood-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding: 16px 20px;
+}
+
+.avg-mood-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #64748b;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+    display: block;
+}
+
+.avg-mood-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: #123e42;
+    margin: 0;
+}
+
+.avg-mood-emoji {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #dcfce7;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 24px;
+    border: 4px solid #bbf7d0;
+}
+
+/* Chart Card */
+.chart-card {
+    padding: 24px;
+}
+
+.chart-card h3 {
+    font-size: 14px;
+    font-weight: 700;
+    color: #123e42;
+    margin-bottom: 20px;
+}
+
+.chart-wrapper {
+    height: 220px;
+    margin-bottom: 24px;
+    margin-left: -15px;
+    /* Offset the y-axis to align left better */
+}
+
+/* Custom Legend */
+.custom-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 10px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+}
+
+.legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 12px;
+}
+
+.legend-text {
+    font-size: 14px;
+    font-weight: 600;
+    color: #334155;
+    flex: 1;
+}
+
+.legend-status {
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    background: #f1f5f9;
+    padding: 4px 12px;
+    border-radius: 12px;
+}
+
+.empty-chart-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(2px);
+    z-index: 10;
+    border-radius: 12px;
+}
+
+.empty-chart-overlay p {
+    font-size: 13px;
+    font-weight: 600;
+    color: #64748b;
+    margin-top: 8px;
+}

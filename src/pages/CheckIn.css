@@ -1,0 +1,191 @@
+.checkin-container {
+    padding: 24px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.checkin-header {
+    text-align: center;
+    margin-top: 20px;
+    margin-bottom: 32px;
+}
+
+.checkin-header h1 {
+    font-size: 24px;
+    color: #123e42;
+    font-weight: 700;
+    line-height: 1.3;
+}
+
+/* Mood Selector */
+.mood-selector {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 32px;
+    padding: 0 8px;
+}
+
+.mood-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: white;
+    border: 2px solid transparent;
+    border-radius: 16px;
+    padding: 12px 8px;
+    flex: 1;
+    transition: all 0.3s;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.mood-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(42, 157, 143, 0.1);
+}
+
+.mood-btn.selected {
+    border-color: var(--primary);
+    background: var(--primary-surface);
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(42, 157, 143, 0.2);
+}
+
+.mood-emoji {
+    font-size: 32px;
+    line-height: 1;
+}
+
+.mood-btn .mood-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: #64748b;
+    text-align: center;
+    margin-top: 4px;
+}
+
+.mood-btn.selected .mood-label {
+    color: var(--primary-dark);
+}
+
+/* Form Area */
+.checkin-form {
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.checkin-form h3 {
+    font-size: 14px;
+    color: #123e42;
+    margin: 0;
+    font-weight: 700;
+}
+
+/* Sliders */
+.slider-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.slider-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    color: #475569;
+    font-weight: 500;
+}
+
+.slider-value {
+    font-weight: 700;
+    color: var(--primary-dark);
+}
+
+.custom-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 8px;
+    background: #e2e8f0;
+    outline: none;
+    border-radius: 4px;
+}
+
+.custom-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--primary);
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(42, 157, 143, 0.4);
+    border: 2px solid white;
+}
+
+.custom-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--primary);
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(42, 157, 143, 0.4);
+    border: 2px solid white;
+}
+
+/* Journal Area */
+.journal-area {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.journal-area textarea {
+    width: 100%;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    padding: 16px;
+    font-family: inherit;
+    font-size: 14px;
+    resize: none;
+    background: #f8fafc;
+    color: var(--text-main);
+    transition: all 0.3s;
+}
+
+.journal-area textarea:focus {
+    outline: none;
+    border-color: var(--primary-light);
+    background: white;
+    box-shadow: 0 0 0 3px var(--primary-surface);
+}
+
+/* Save Button */
+.checkin-save-btn {
+    margin-top: 8px;
+    width: 100%;
+    padding: 16px;
+    background-color: #cbd5e1;
+    /* Disabled state color */
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+.checkin-save-btn.ready {
+    background-color: var(--primary-light);
+    /* Lighter teal as shown in mockup */
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(42, 157, 143, 0.2) !important;
+}
+
+.checkin-save-btn.ready:hover {
+    background-color: var(--primary);
+    transform: translateY(-2px) !important;
+}
