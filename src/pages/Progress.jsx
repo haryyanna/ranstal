@@ -1,226 +1,326 @@
-import { useState, useEffect } from 'react';
-import { Flame, Calendar, Info } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useState } from 'react';
+import { MapPin, Cloud, Users, Thermometer, Droplets, Wind, Search, Navigation, Compass } from 'lucide-react';
 import './Progress.css';
 
-const DEFAULT_DATA = [
-    { name: 'Min', depresi: 0, kecemasan: 0, stres: 0 },
-    { name: 'Sen', depresi: 0, kecemasan: 0, stres: 0 },
-    { name: 'Sel', depresi: 0, kecemasan: 0, stres: 0 },
-    { name: 'Rab', depresi: 0, kecemasan: 0, stres: 0 },
-    { name: 'Kam', depresi: 0, kecemasan: 0, stres: 0 },
-    { name: 'Jum', depresi: 0, kecemasan: 0, stres: 0 },
-    { name: 'Sab', depresi: 0, kecemasan: 0, stres: 0 }
-];
-
-const MOOD_DATA_MAP = {
-    1: { text: "Sangat Sedih", emoji: "😭" },
-    2: { text: "Sedih", emoji: "😔" },
-    3: { text: "Biasa Saja", emoji: "😐" },
-    4: { text: "Senang", emoji: "🙂" },
-    5: { text: "Sangat Senang", emoji: "😄" }
+const INDONESIAN_LOCATIONS = {
+    'bali': { province: 'Bali', districts: ['Denpasar', 'Ubud', 'Kuta', 'Sanur', 'Gianyar', 'Klungkung', 'Bangli'] },
+    'jakarta': { province: 'Jakarta', districts: ['Jakarta Pusat', 'Jakarta Timur', 'Jakarta Barat', 'Jakarta Selatan', 'Jakarta Utara', 'Kepulauan Seribu'] },
+    'jawa barat': { province: 'Jawa Barat', districts: ['Bandung', 'Bogor', 'Sukabumi', 'Cianjur', 'Indramayu', 'Cirebon', 'Karawang'] },
+    'jawa tengah': { province: 'Jawa Tengah', districts: ['Semarang', 'Solo', 'Salatiga', 'Pekalongan', 'Tegal', 'Sukoharjo', 'Wonogiri'] },
+    'yogyakarta': { province: 'Yogyakarta', districts: ['Yogyakarta', 'Sleman', 'Bantul', 'Gunung Kidul', 'Kulon Progo'] },
+    'jawa timur': { province: 'Jawa Timur', districts: ['Surabaya', 'Malang', 'Pasuruan', 'Probolinggo', 'Jember', 'Banyuwangi', 'Mojokerto'] },
+    'sumatera utara': { province: 'Sumatera Utara', districts: ['Medan', 'Binjai', 'Pematangsiantar', 'Tebing Tinggi', 'Deli Serdang'] },
+    'sumatera barat': { province: 'Sumatera Barat', districts: ['Padang', 'Bukittinggi', 'Payakumbuh', 'Pariaman', 'Agam'] },
+    'riau': { province: 'Riau', districts: ['Pekanbaru', 'Dumai', 'Bangkinang', 'Indragiri Hilir'] },
+    'lampung': { province: 'Lampung', districts: ['Bandar Lampung', 'Metro', 'Pringsewu', 'Tanggamus', 'Lampung Selatan'] }
 };
 
 const Progress = () => {
-    const [hasData, setHasData] = useState(false);
-    const [chartData, setChartData] = useState(DEFAULT_DATA);
-    const [stats, setStats] = useState({
-        streak: 0,
-        sessions: 0,
-        moodText: "Belum ada data",
-        moodEmoji: "❓"
-    });
+    const [destinationSearch, setDestinationSearch] = useState('');
+    const [destinationData, setDestinationData] = useState(null);
+    const [showDestinationInfo, setShowDestinationInfo] = useState(false);
+    const [userLocation, setUserLocation] = useState(null);
+    const [locationError, setLocationError] = useState('');
+    const [filteredLocations, setFilteredLocations] = useState([]);
+    const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
 
-    useEffect(() => {
-        const username = localStorage.getItem('moodify_currentUser');
-        if (!username) return;
-
-        const userKey = `moodify_data_${username}`;
-        try {
-            const savedData = localStorage.getItem(userKey);
-            if (savedData) {
-                const userData = JSON.parse(savedData);
-                
-                // Initialize chart data with defaults
-                let newChartData = [...DEFAULT_DATA];
-
-                if (userData.hasCheckedIn || (userData.history && userData.history.length > 0)) {
-                    setHasData(true);
-
-                    // Get saved mood
-                    const moodInfo = MOOD_DATA_MAP[userData.lastMood] || { text: "Kurang Baik", emoji: "😀" };
-
-                    // Parse history into chart data
-                    if (userData.history && userData.history.length > 0) {
-                        const historyData = userData.history.slice(-7); // Get up to last 7 days Max
-                        
-                        // Overwrite DEFAULT_DATA from the end backwards
-                        const startIndex = Math.max(0, 7 - historyData.length);
-                        
-                        for (let i = 0; i < historyData.length; i++) {
-                            const entry = historyData[i];
-                            const dateObj = new Date(entry.date);
-                            const dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
-                            const dayName = dayNames[dateObj.getDay()];
-
-                            newChartData[startIndex + i] = {
-                                name: dayName,
-                                depresi: Math.max(0, entry.sliders?.sadness || 0),
-                                kecemasan: Math.max(0, entry.sliders?.anxiety || 0),
-                                stres: Math.max(0, entry.sliders?.stress || 0)
-                            };
-                        }
-                    }
-
-                    // Set state
-                    setChartData(newChartData);
-                    setStats({
-                        streak: userData.streak || 0,
-                        sessions: userData.totalSessions || 0,
-                        moodText: moodInfo.text,
-                        moodEmoji: moodInfo.emoji
-                    });
-                } else {
-                    // No history but they might just be empty
-                    setChartData(newChartData);
-                }
-            }
-        } catch (e) {
-            console.error("Parse error", e);
+    const getLocationFromGPS = () => {
+        setLocationError('');
+        if (!navigator.geolocation) {
+            setLocationError('Browser tidak mendukung GPS.');
+            return;
         }
-    }, []);
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const { latitude, longitude, accuracy } = position.coords;
+                setUserLocation({ latitude, longitude, accuracy });
+                const locString = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+                setDestinationSearch(`Lokasi saya: ${locString}`);
+                searchDestinationWithGPS(latitude, longitude);
+            },
+            (error) => {
+                const msg = error.code === 1 ? 'Izin GPS ditolak' : error.code === 2 ? 'GPS tidak tersedia' : 'Error GPS';
+                setLocationError(msg);
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    };
 
-    const clearData = () => {
-        const username = localStorage.getItem('moodify_currentUser');
-        if (!username) return;
+    const searchDestinationWithGPS = (lat, lon) => {
+        const mockData = {
+            name: `Lokasi ${lat.toFixed(2)}, ${lon.toFixed(2)}`,
+            coordinates: { latitude: lat, longitude: lon },
+            weather: { temp: 25 + Math.floor(Math.random() * 10), condition: 'Cerah', humidity: 60 + Math.floor(Math.random() * 30), wind: 5 + Math.floor(Math.random() * 15) },
+            crowd: { level: 'Sedang', percentage: 50 + Math.floor(Math.random() * 30), description: 'Kondisi normal' },
+            health: { airQuality: 'Baik', hospitalAccess: 'Mudah', pharmacyAccess: 'Mudah' },
+            tips: ['Gunakan sunscreen', 'Bawa air minum cukup', 'Jaga kebersihan makanan']
+        };
+        setDestinationData(mockData);
+        setShowDestinationInfo(true);
+    };
 
-        const userKey = `moodify_data_${username}`;
-        try {
-            const savedData = localStorage.getItem(userKey);
-            if (savedData) {
-                const userData = JSON.parse(savedData);
-                userData.hasCheckedIn = false;
-                userData.lastMood = null;
-                userData.lastSliders = null;
-                // keep streak and totalSessions or clear them? The requirement says reset chart.
-                // let's just reset everything for demo purposes
-                userData.streak = 0;
-                userData.totalSessions = 0;
-                localStorage.setItem(userKey, JSON.stringify(userData));
+    const handleLocationSearch = (value) => {
+        setDestinationSearch(value);
+        if (!value.trim()) {
+            setFilteredLocations([]);
+            setShowLocationSuggestions(false);
+            return;
+        }
+        const lower = value.toLowerCase();
+        const matches = Object.entries(INDONESIAN_LOCATIONS)
+            .filter(([key, data]) => key.includes(lower) || data.province.toLowerCase().includes(lower) || data.districts.some(d => d.toLowerCase().includes(lower)))
+            .flatMap(([key, data]) => [
+                { type: 'province', name: data.province, key },
+                ...data.districts.map(d => ({ type: 'district', name: d, province: data.province, key }))
+            ])
+            .slice(0, 10);
+        setFilteredLocations(matches);
+        setShowLocationSuggestions(true);
+    };
+
+    // Mock destination data (in production, this would call a real weather API)
+    const searchDestination = () => {
+        if (!destinationSearch.trim()) return;
+        
+        // Simulate API call with mock data
+        const mockDestinations = {
+            'bali': {
+                name: 'Bali',
+                weather: { temp: 28, condition: 'Cerah Berawan', humidity: 75, wind: 12 },
+                crowd: { level: 'Tinggi', percentage: 85, description: 'Sedang musim liburan, banyak wisatawan domestik dan internasional' },
+                health: { airQuality: 'Baik', hospitalAccess: 'Mudah', pharmacyAccess: 'Sangat Mudah' },
+                tips: ['Gunakan sunscreen SPF 30+', 'Bawa botol air minum', 'Hindari aktivitas outdoor 11-14 WIB', 'Selalu gunakan masker di area ramai']
+            },
+            'yogyakarta': {
+                name: 'Yogyakarta',
+                weather: { temp: 27, condition: 'Cerah', humidity: 70, wind: 8 },
+                crowd: { level: 'Sedang', percentage: 60, description: 'Normal, tidak terlalu ramai namun tetap ada aktivitas wisata' },
+                health: { airQuality: 'Sedang', hospitalAccess: 'Mudah', pharmacyAccess: 'Mudah' },
+                tips: ['Kenakan pakaian tipis dan nyaman', 'Bawa payung untuk hujan mendadak', 'Jaga kebersihan makanan', 'Cek kesehatan sebelum naik gunung']
+            },
+            'bandung': {
+                name: 'Bandung',
+                weather: { temp: 22, condition: 'Berawan', humidity: 80, wind: 15 },
+                crowd: { level: 'Sedang', percentage: 55, description: 'Cukup nyaman untuk berwisata keluarga' },
+                health: { airQuality: 'Baik', hospitalAccess: 'Sangat Mudah', pharmacyAccess: 'Sangat Mudah' },
+                tips: ['Bawa jaket karena suhu dingin', 'Perhatikan kondisi jalan menuju Lembang', 'Siapkan obat maag untuk makanan pedas', 'Jaga jarak di tempat wisata populer']
+            },
+            'jakarta': {
+                name: 'Jakarta',
+                weather: { temp: 32, condition: 'Panas Terik', humidity: 65, wind: 10 },
+                crowd: { level: 'Sangat Tinggi', percentage: 95, description: 'Sangat ramai, waspada kemacetan dan kerumunan' },
+                health: { airQuality: 'Sedang', hospitalAccess: 'Sangat Mudah', pharmacyAccess: 'Sangat Mudah' },
+                tips: ['Gunakan masker N95 jika sensitif polusi', 'Hindari aktivitas outdoor siang hari', 'Selalu bawa air minum', 'Pilih transportasi umum untuk hindari macet']
+            },
+            'surabaya': {
+                name: 'Surabaya',
+                weather: { temp: 30, condition: 'Cerah', humidity: 72, wind: 14 },
+                crowd: { level: 'Sedang', percentage: 50, description: 'Kondisi normal, cocok untuk wisata keluarga' },
+                health: { airQuality: 'Baik', hospitalAccess: 'Mudah', pharmacyAccess: 'Mudah' },
+                tips: ['Coba kuliner lokal dengan hati-hati', 'Bawa obat maag untuk makanan pedas', 'Gunakan sunscreen', 'Jaga kebersihan tangan sebelum makan']
             }
-        } catch (e) { }
+        };
 
-        setHasData(false);
-        setChartData(DEFAULT_DATA);
-        setStats({ streak: 0, sessions: 0, moodText: "Belum ada data", moodEmoji: "❓" });
+        const searchTerm = destinationSearch.toLowerCase();
+        const foundDestination = Object.values(mockDestinations).find(
+            dest => dest.name.toLowerCase().includes(searchTerm)
+        );
+
+        if (foundDestination) {
+            setDestinationData(foundDestination);
+            setShowDestinationInfo(true);
+        } else {
+            // Generate generic data for unknown destinations
+            setDestinationData({
+                name: destinationSearch,
+                weather: { temp: 25 + Math.floor(Math.random() * 10), condition: 'Cerah Berawan', humidity: 60 + Math.floor(Math.random() * 30), wind: 5 + Math.floor(Math.random() * 15) },
+                crowd: { level: 'Sedang', percentage: 50 + Math.floor(Math.random() * 30), description: 'Data kerumunan tidak tersedia, waspada tetap disarankan' },
+                health: { airQuality: 'Baik', hospitalAccess: 'Perlu Cek', pharmacyAccess: 'Perlu Cek' },
+                tips: ['Selalu bawa P3K lengkap', 'Cek lokasi rumah sakit terdekat', 'Jaga kebersihan makanan dan minuman', 'Gunakan masker di area ramai']
+            });
+            setShowDestinationInfo(true);
+        }
     };
 
     return (
         <div className="progress-container animate-fade-in">
-            {/* Header */}
-            <div className="progress-header">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h1>Perkembanganmu</h1>
-                    {hasData && (
-                        <button onClick={clearData} className="btn-link" style={{ color: '#64748b', fontSize: '12px' }}>Reset</button>
-                    )}
-                </div>
-                <p>
-                    {hasData
-                        ? "Kamu sudah berjuang dengan sangat baik!"
-                        : "Mulai perjalananmu dengan Check-in hari ini."}
-                </p>
-            </div>
+            <header className="progress-top-brand">
+                <div className="feature-heading"><MapPin className="feature-heading-icon" /><span className="brand-text">Jelajah Destinasi</span></div>
+            </header>
 
-            {/* Stats Cards */}
-            <div className="stats-row">
-                <div className="stat-card orange-card">
-                    <div className="stat-icon-wrapper orange-icon">
-                        <Flame size={20} color="#ea580c" />
+            {/* Destination Information Section */}
+            <div className="destination-section glass-card">
+                <div className="destination-heading section-heading-row">
+                    <div className="destination-heading-copy">
+                        <span className="destination-eyebrow">PANDUAN PERJALANAN</span>
+                        <h3 className="destination-title">Temukan destinasi berikutnya</h3>
+                        <p className="destination-subtitle">Dapatkan gambaran cuaca, keramaian, dan tips lokal sebelum berangkat.</p>
                     </div>
-                    <h2 className="stat-number">{stats.streak}</h2>
-                    <span className="stat-label">HARI BERUNTUN</span>
+                    <div className="destination-heading-icon"><MapPin size={26} /></div>
                 </div>
 
-                <div className="stat-card blue-card">
-                    <div className="stat-icon-wrapper blue-icon">
-                        <Calendar size={20} color="#2563eb" />
-                    </div>
-                    <h2 className="stat-number">{stats.sessions}</h2>
-                    <span className="stat-label">TOTAL SESI</span>
-                </div>
-            </div>
-
-            {/* Average Mood */}
-            <div className="glass-card avg-mood-card">
-                <div className="avg-mood-text">
-                    <span className="avg-mood-label">MOOD RATA-RATA</span>
-                    <h3 className="avg-mood-value">{stats.moodText}</h3>
-                </div>
-                <div className="avg-mood-emoji">
-                    <span>{stats.moodEmoji}</span>
-                </div>
-            </div>
-
-            {/* Chart Section */}
-            <div className="glass-card chart-card">
-                <h3>Grafik DASS-21 Mingguan</h3>
-                <div className="chart-wrapper" style={{ position: 'relative' }}>
-
-                    {!hasData && (
-                        <div className="empty-chart-overlay">
-                            <Info size={24} color="#94a3b8" />
-                            <p>Belum ada data check-in</p>
+                <div className="destination-search">
+                    <input
+                        type="text"
+                        placeholder="Cari destinasi atau ketik kabupaten, kecamatan..."
+                        value={destinationSearch}
+                        onChange={(e) => handleLocationSearch(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && searchDestination()}
+                        autoComplete="off"
+                    />
+                    <button className="btn-primary destination-search-button" onClick={searchDestination} title="Cari destinasi">
+                        <Search size={18} />
+                        Cari
+                    </button>
+                    <button className="btn-secondary destination-gps-button" onClick={getLocationFromGPS} title="Lacak lokasi GPS saat ini">
+                        <Compass size={18} />
+                        GPS
+                    </button>
+                    
+                    {showLocationSuggestions && filteredLocations.length > 0 && (
+                        <div className="location-suggestions">
+                            {filteredLocations.map((loc, idx) => (
+                                <button
+                                    key={idx}
+                                    className="suggestion-item"
+                                    onClick={() => {
+                                        setDestinationSearch(loc.name);
+                                        setShowLocationSuggestions(false);
+                                        setFilteredLocations([]);
+                                    }}
+                                >
+                                    <span className="suggestion-type">{loc.type === 'province' ? '📍 Provinsi' : '📍 Kabupaten'}</span>
+                                    <span className="suggestion-name">{loc.name}</span>
+                                    {loc.province && <span className="suggestion-province">({loc.province})</span>}
+                                </button>
+                            ))}
                         </div>
                     )}
-
-                    <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                            <defs>
-                                <linearGradient id="colorDepresi" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
-                                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                                </linearGradient>
-                                <linearGradient id="colorKecemasan" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#f97316" stopOpacity={0.8} />
-                                    <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
-                                </linearGradient>
-                                <linearGradient id="colorStres" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8} />
-                                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} dy={10} />
-                            <YAxis domain={[0, 10]} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                            <Tooltip
-                                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                            />
-                            <Area type="monotone" dataKey="depresi" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorDepresi)" />
-                            <Area type="monotone" dataKey="kecemasan" stroke="#f97316" strokeWidth={2} fillOpacity={1} fill="url(#colorKecemasan)" />
-                            <Area type="monotone" dataKey="stres" stroke="#ef4444" strokeWidth={2} fillOpacity={1} fill="url(#colorStres)" />
-                        </AreaChart>
-                    </ResponsiveContainer>
                 </div>
 
-                {/* Custom Legend */}
-                <div className="custom-legend">
-                    <div className="legend-item">
-                        <span className="legend-dot" style={{ backgroundColor: '#2563eb' }}></span>
-                        <span className="legend-text">Depresi</span>
-                        <span className="legend-status">Stabil</span>
+                {locationError && (
+                    <div className="alert-warning" style={{ marginTop: '10px', padding: '10px', background: '#fef3c7', borderRadius: '8px', color: '#92400e' }}>
+                        ⚠️ {locationError}
                     </div>
-                    <div className="legend-item">
-                        <span className="legend-dot" style={{ backgroundColor: '#ea580c' }}></span>
-                        <span className="legend-text">Kecemasan</span>
-                        <span className="legend-status">Stabil</span>
+                )}
+
+                {userLocation && (
+                    <div className="location-display" style={{ marginTop: '10px', padding: '10px', background: '#dbeafe', borderRadius: '8px', color: '#1e40af', fontSize: '13px' }}>
+                        📍 Lokasi GPS: {userLocation.latitude.toFixed(4)}, {userLocation.longitude.toFixed(4)} (akurasi: ±{userLocation.accuracy.toFixed(0)}m)
                     </div>
-                    <div className="legend-item">
-                        <span className="legend-dot" style={{ backgroundColor: '#dc2626' }}></span>
-                        <span className="legend-text">Stres</span>
-                        <span className="legend-status">Stabil</span>
+                )}
+
+                {showDestinationInfo && destinationData && (
+                    <div className="destination-info animate-fade-in">
+                        <div className="destination-header">
+                            <h4 className="destination-name">{destinationData.name}</h4>
+                            <span className="destination-badge">Wisata Aman</span>
+                        </div>
+
+                        {/* Weather Information */}
+                        <div className="info-grid">
+                            <div className="info-card weather-card">
+                                <div className="info-icon">
+                                    <Thermometer size={24} color="#ef4444" />
+                                </div>
+                                <div className="info-content">
+                                    <span className="info-value">{destinationData.weather.temp}°C</span>
+                                    <span className="info-label">Suhu</span>
+                                </div>
+                            </div>
+                            <div className="info-card weather-card">
+                                <div className="info-icon">
+                                    <Cloud size={24} color="#64748b" />
+                                </div>
+                                <div className="info-content">
+                                    <span className="info-value">{destinationData.weather.condition}</span>
+                                    <span className="info-label">Cuaca</span>
+                                </div>
+                            </div>
+                            <div className="info-card weather-card">
+                                <div className="info-icon">
+                                    <Droplets size={24} color="#0ea5e9" />
+                                </div>
+                                <div className="info-content">
+                                    <span className="info-value">{destinationData.weather.humidity}%</span>
+                                    <span className="info-label">Kelembaban</span>
+                                </div>
+                            </div>
+                            <div className="info-card weather-card">
+                                <div className="info-icon">
+                                    <Wind size={24} color="#22c55e" />
+                                </div>
+                                <div className="info-content">
+                                    <span className="info-value">{destinationData.weather.wind} km/h</span>
+                                    <span className="info-label">Angin</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Crowd Level */}
+                        <div className="crowd-section">
+                            <div className="crowd-header">
+                                <Users size={20} color="#8b5cf6" />
+                                <span className="crowd-title">Tingkat Kerumunan</span>
+                            </div>
+                            <div className="crowd-bar-container">
+                                <div className="crowd-bar">
+                                    <div 
+                                        className="crowd-fill" 
+                                        style={{ 
+                                            width: `${destinationData.crowd.percentage}%`,
+                                            backgroundColor: destinationData.crowd.percentage > 80 ? '#ef4444' : 
+                                                           destinationData.crowd.percentage > 60 ? '#f97316' : 
+                                                           destinationData.crowd.percentage > 40 ? '#eab308' : '#10b981'
+                                        }}
+                                    />
+                                </div>
+                                <span className="crowd-percentage">{destinationData.crowd.percentage}%</span>
+                            </div>
+                            <div className="crowd-info">
+                                <span className="crowd-level">{destinationData.crowd.level}</span>
+                                <span className="crowd-description">{destinationData.crowd.description}</span>
+                            </div>
+                        </div>
+
+                        {/* Health Access */}
+                        <div className="health-access-section">
+                            <h5 className="health-access-title">Akses Layanan Kesehatan</h5>
+                            <div className="health-access-grid">
+                                <div className="health-access-item">
+                                    <span className="health-label">Kualitas Udara:</span>
+                                    <span className={`health-value ${destinationData.health.airQuality === 'Baik' ? 'good' : 'moderate'}`}>
+                                        {destinationData.health.airQuality}
+                                    </span>
+                                </div>
+                                <div className="health-access-item">
+                                    <span className="health-label">Akses Rumah Sakit:</span>
+                                    <span className="health-value">{destinationData.health.hospitalAccess}</span>
+                                </div>
+                                <div className="health-access-item">
+                                    <span className="health-label">Akses Apotek:</span>
+                                    <span className="health-value">{destinationData.health.pharmacyAccess}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Travel Tips */}
+                        <div className="travel-tips-section">
+                            <h5 className="travel-tips-title">
+                                <Navigation size={18} color="#3b82f6" />
+                                Tips Kesehatan Perjalanan
+                            </h5>
+                            <ul className="travel-tips-list">
+                                {destinationData.tips.map((tip, index) => (
+                                    <li key={index} className="travel-tip-item">
+                                        <span className="tip-bullet">💡</span>
+                                        <span>{tip}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
         </div>
     );

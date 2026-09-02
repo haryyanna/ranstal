@@ -1,45 +1,113 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, CheckCircle2 } from 'lucide-react';
+import { Sparkles, CheckCircle2, AlertCircle, BookOpen, Calendar, HelpCircle, ClipboardCheck } from 'lucide-react';
+import { trackEvent } from '../lib/analytics';
+import ranstalLogo from '../assets/LOGO RANSTAL.webp';
 import './CheckIn.css';
 
-const MOODS = [
-    { id: 1, label: 'Sangat Sedih', emoji: '😭' },
-    { id: 2, label: 'Sedih', emoji: '😔' },
-    { id: 3, label: 'Biasa Saja', emoji: '😐' },
-    { id: 4, label: 'Senang', emoji: '🙂' },
-    { id: 5, label: 'Sangat Senang', emoji: '😄' }
+const PROGRAM_DAYS = [
+  {
+    day: 1,
+    title: 'Siapkan Perlengkapan P3K',
+    desc: 'Periksa dan siapkan kotak P3K lengkap: plester, antiseptik, kasa steril, gunting kecil, dan termometer. Pastikan semua dalam kondisi baik.',
+    tip: 'Obat yang wajib ada: Paracetamol, obat anti-mabuk, obat diare, minyak kayu putih, dan obat alergi pribadi.'
+  },
+  {
+    day: 2,
+    title: 'Hidrasi Selama Perjalanan',
+    desc: 'Minum minimal 8 gelas air putih hari ini secara bertahap. Bawa botol minum isi ulang sendiri agar mudah dijangkau selama perjalanan.',
+    tip: 'Minum air hangat + jahe membantu mencegah mabuk perjalanan dan menghangatkan tubuh.'
+  },
+  {
+    day: 3,
+    title: 'Kenali Obat-obatan Dasar',
+    desc: 'Pelajari fungsi dan dosis masing-masing obat yang dibawa. Simpan instruksi penggunaan di dalam wadah obat agar mudah dibaca saat dibutuhkan.',
+    tip: 'Selalu periksa masa kadaluarsa setiap obat sebelum dibawa berangkat wisata.'
+  },
+  {
+    day: 4,
+    title: 'Pertolongan Pertama Dasar',
+    desc: 'Pelajari langkah pertolongan pertama untuk luka lecet, demam, tersedak, dan serangga menggigit. Simpan panduan singkat di ponsel Anda.',
+    tip: 'Untuk luka bersih dengan air mengalir terlebih dahulu sebelum diberi antiseptik dan ditutup plester.'
+  },
+  {
+    day: 5,
+    title: 'Kebersihan Selama Wisata',
+    desc: 'Selalu cuci tangan dengan sabun selama 20 detik sebelum makan dan setelah dari toilet. Bawa hand sanitizer 60%+ alkohol untuk keadaan darurat.',
+    tip: 'Hindari es batu yang tidak jelas sumbernya saat membeli minuman di tempat wisata.'
+  },
+  {
+    day: 6,
+    title: 'Istirahat Cukup Selama Wisata',
+    desc: 'Jadwalkan istirahat 15-30 menit setiap 2-3 jam perjalanan. Pastikan anak tidur cukup malam sebelumnya agar stamina tetap prima.',
+    tip: 'Tidur yang cukup meningkatkan daya tahan tubuh dan mencegah mudah sakit selama perjalanan.'
+  },
+  {
+    day: 7,
+    title: 'Komitmen Perjalanan Aman',
+    desc: 'Evaluasi kesiapan perlengkapan kesehatan Anda selama seminggu ini. Buat checklist pribadi untuk perjalanan wisata berikutnya.',
+    tip: 'Simpan nomor darurat (rumah sakit terdekat, polisi, keluarga) di ponsel dan catatan kecil yang mudah dijangkau!'
+  }
 ];
 
 const CheckIn = () => {
     const navigate = useNavigate();
-    const [selectedMood, setSelectedMood] = useState(null);
-
-    const [sliders, setSliders] = useState({
-        sadness: 0,
-        anxiety: 0,
-        stress: 0
-    });
-
+    const [activeTab, setActiveTab] = useState('log'); // log, program
+    const [waterIntake, setWaterIntake] = useState(4); // in glasses
+    const [sugarIntake, setSugarIntake] = useState(15); // in grams
+    const [exerciseTime, setExerciseTime] = useState(10); // in minutes
+    const [eatFruit, setEatFruit] = useState(false);
+    
     const [journalText, setJournalText] = useState('');
     const [isSaved, setIsSaved] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [syncNotice, setSyncNotice] = useState('');
+    const [hasCheckedInToday, setHasCheckedInToday] = useState(false);
 
-    const handleSliderChange = (type, value) => {
-        setSliders(prev => ({
-            ...prev,
-            [type]: parseInt(value, 10)
-        }));
-    };
+    // Program status states
+    const [completedDays, setCompletedDays] = useState({});
 
-    const handleSave = () => {
+    const getTodayKey = () => new Date().toISOString().split('T')[0];
+
+    useEffect(() => {
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+        const checkTodayStatus = async () => {
+            const username = localStorage.getItem('moodify_currentUser');
+            if (!username) return;
+            const userKey = `moodify_data_${username}`;
+            const todayKey = getTodayKey();
+            try {
+                const raw = localStorage.getItem(userKey);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    const localAlready = Array.isArray(parsed.history) && parsed.history.some((h) => h?.date?.startsWith(todayKey));
+                    if (localAlready) {
+                        setHasCheckedInToday(true);
+                        setSyncNotice('Kamu telah mencatat laporan kesehatan hari ini. Mari lanjutkan esok hari!');
+                    }
+                    if (parsed.completedProgramDays) {
+                        setCompletedDays(parsed.completedProgramDays);
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        };
+        checkTodayStatus();
+    }, []);
+
+    const handleSave = async () => {
+        setSyncNotice('');
+
         const username = localStorage.getItem('moodify_currentUser');
         if (!username) {
-            alert('Silakan login terlebih dahulu di halaman Home!');
+            alert('Silakan isi namamu terlebih dahulu di halaman Home!');
             navigate('/home');
             return;
         }
 
         const userKey = `moodify_data_${username}`;
+        const todayKey = getTodayKey();
         let userData = {
             hasCheckedIn: false,
             lastMood: null,
@@ -59,134 +127,283 @@ const CheckIn = () => {
             console.error(e);
         }
 
-        userData.hasCheckedIn = true;
-        userData.lastMood = selectedMood;
-        userData.lastSliders = sliders;
+        const localAlreadyCheckedInToday = Array.isArray(userData.history) && userData.history.some((h) => h?.date?.startsWith(todayKey));
+        if (localAlreadyCheckedInToday || hasCheckedInToday) {
+            setHasCheckedInToday(true);
+            setSyncNotice('Kamu telah mencatat laporan kesehatan hari ini. Mari lanjutkan esok hari!');
+            window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+            return;
+        }
 
-        // Update stats
+        setIsSaving(true);
+        userData.hasCheckedIn = true;
+        
+        // Convert check-in to beverage metrics
+        userData.lastSliders = {
+            sadness: sugarIntake, // re-map to old field names so stats charts can read without breaking
+            anxiety: waterIntake, 
+            stress: exerciseTime
+        };
+
         userData.totalSessions += 1;
         userData.streak += 1;
 
-        // Add to history
-        userData.history.push({
+        const newEntry = {
             date: new Date().toISOString(),
-            mood: selectedMood,
-            sliders: sliders,
+            sliders: {
+                sadness: sugarIntake,
+                anxiety: waterIntake,
+                stress: exerciseTime
+            },
+            eatFruit: eatFruit,
             journalText: journalText
-        });
+        };
+
+        if (!userData.history) userData.history = [];
+        userData.history.push(newEntry);
+
+        // Award XP
+        if (!userData.gamification) userData.gamification = { xp: 0, level: 1, badges: [] };
+        userData.gamification.xp += 25;
+        userData.gamification.level = Math.max(1, Math.floor(userData.gamification.xp / 60) + 1);
 
         localStorage.setItem(userKey, JSON.stringify(userData));
-
+        setIsSaving(false);
+        setHasCheckedInToday(true);
         setIsSaved(true);
+        
+        trackEvent('beverage_log_saved', {
+            sugar: sugarIntake,
+            water: waterIntake,
+            exercise: exerciseTime,
+            eatFruit
+        }).catch(() => {});
+
         setTimeout(() => {
             navigate('/progress');
         }, 1500);
     };
 
-    if (isSaved) {
-        return (
-            <div className="checkin-container success-container animate-fade-in">
-                <div className="success-content">
-                    <CheckCircle2 size={64} color="#10b981" className="pulse-animation" />
-                    <h2>Jurnal Tersimpan!</h2>
-                    <p>Memindahkanmu ke halaman Progress...</p>
-                </div>
-            </div>
-        );
-    }
+    const toggleProgramDay = (dayNum) => {
+        const username = localStorage.getItem('moodify_currentUser');
+        if (!username) return;
+
+        const userKey = `moodify_data_${username}`;
+        setCompletedDays(prev => {
+            const next = { ...prev, [dayNum]: !prev[dayNum] };
+            
+            // Save to local storage
+            try {
+                const raw = localStorage.getItem(userKey);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    parsed.completedProgramDays = next;
+                    
+                    // Award XP on checkin completion
+                    if (!parsed.gamification) parsed.gamification = { xp: 0, level: 1, badges: [] };
+                    if (next[dayNum]) {
+                        parsed.gamification.xp += 20;
+                        parsed.gamification.level = Math.max(1, Math.floor(parsed.gamification.xp / 60) + 1);
+                        trackEvent('program_day_completed', { dayNum }).catch(() => {});
+                    }
+                    localStorage.setItem(userKey, JSON.stringify(parsed));
+                }
+            } catch (e) {
+                console.error(e);
+            }
+            
+            return next;
+        });
+    };
 
     return (
         <div className="checkin-container animate-fade-in">
-            {/* Header */}
-            <div className="checkin-header">
-                <div className="badge pulse-animation" style={{ margin: '0 auto 16px auto' }}>
-                    <Sparkles size={14} className="badge-icon" />
-                    <span>DAILY CHECK-IN</span>
-                </div>
-                <h1>Bagaimana perasaanmu <br /> hari ini?</h1>
-            </div>
-
-            {/* Mood Selector */}
-            <div className="mood-selector">
-                {MOODS.map((mood) => (
-                    <button
-                        key={mood.id}
-                        className={`mood-btn ${selectedMood === mood.id ? 'selected' : ''}`}
-                        onClick={() => setSelectedMood(mood.id)}
-                    >
-                        <div className="mood-emoji">{mood.emoji}</div>
-                        <span className="mood-label">{mood.label}</span>
-                    </button>
-                ))}
-            </div>
-
-            {/* Form Area */}
-            <div className="checkin-form glass-card">
-                <h3>Gambarkan intensitasnya (Opsional)</h3>
-
-                {/* Sliders */}
-                <div className="slider-group">
-                    <div className="slider-header">
-                        <span>Rasa Sedih / Kosong</span>
-                        <span className="slider-value">{sliders.sadness} / 10</span>
-                    </div>
-                    <input
-                        type="range"
-                        min="0" max="10"
-                        value={sliders.sadness}
-                        onChange={(e) => handleSliderChange('sadness', e.target.value)}
-                        className="custom-slider"
-                    />
-                </div>
-
-                <div className="slider-group">
-                    <div className="slider-header">
-                        <span>Rasa Cemas / Gelisah</span>
-                        <span className="slider-value">{sliders.anxiety} / 10</span>
-                    </div>
-                    <input
-                        type="range"
-                        min="0" max="10"
-                        value={sliders.anxiety}
-                        onChange={(e) => handleSliderChange('anxiety', e.target.value)}
-                        className="custom-slider"
-                    />
-                </div>
-
-                <div className="slider-group">
-                    <div className="slider-header">
-                        <span>Rasa Tegang / Stres</span>
-                        <span className="slider-value">{sliders.stress} / 10</span>
-                    </div>
-                    <input
-                        type="range"
-                        min="0" max="10"
-                        value={sliders.stress}
-                        onChange={(e) => handleSliderChange('stress', e.target.value)}
-                        className="custom-slider"
-                    />
-                </div>
-
-                {/* Journal Area */}
-                <div className="journal-area">
-                    <h3>Ceritakan sedikit lebih banyak?</h3>
-                    <textarea
-                        placeholder="Aku merasa..."
-                        value={journalText}
-                        onChange={(e) => setJournalText(e.target.value)}
-                        rows={4}
-                    />
-                </div>
-
-                {/* Save Button */}
-                <button
-                    className={`btn-primary checkin-save-btn ${selectedMood ? 'ready' : ''}`}
-                    onClick={handleSave}
-                    disabled={!selectedMood}
+            {/* Top Navigation Tab Bar */}
+            <div className="checkin-nav-tabs">
+                <button 
+                    className={`tab-btn ${activeTab === 'log' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('log')}
                 >
-                    Simpan Jurnal Hari Ini
+                    📝 Absen Kegiatan
+                </button>
+                <button 
+                    className={`tab-btn ${activeTab === 'program' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('program')}
+                >
+                    📚 Program Gaya Hidup
                 </button>
             </div>
+
+            {/* TAB 1: ABSEN KEGIATAN */}
+            {activeTab === 'log' && (
+                <div className="checkin-card glass-card">
+                    <div className="feature-heading"><ClipboardCheck className="feature-heading-icon" /><h2 className="title">Catat Asupan & Kegiatan Harian</h2></div>
+                    <p className="subtitle">
+                        Yuk pantau gaya hidup sehatmu dengan mencatat asupan gula dan air putih hari ini!
+                    </p>
+
+                    {syncNotice && (
+                        <div className="alert-box info-alert">
+                            <CheckCircle2 size={16} />
+                            <span>{syncNotice}</span>
+                        </div>
+                    )}
+
+                    {!hasCheckedInToday ? (
+                        <div className="checkin-form">
+                            
+                            {/* Water intake slider */}
+                            <div className="form-group">
+                                <div className="slider-label-row">
+                                    <label>Asupan Air Putih</label>
+                                    <strong className="text-primary">{waterIntake} Gelas (~{waterIntake * 250} ml)</strong>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="12"
+                                    step="1"
+                                    value={waterIntake}
+                                    onChange={(e) => setWaterIntake(parseInt(e.target.value))}
+                                    className="custom-range-slider"
+                                />
+                                <div className="range-hints">
+                                    <span>Dehidrasi</span>
+                                    <span>Cukup (8+ Gelas)</span>
+                                </div>
+                            </div>
+
+                            {/* Sugar intake slider */}
+                            <div className="form-group">
+                                <div className="slider-label-row">
+                                    <label>Kira-kira Konsumsi Gula Minuman</label>
+                                    <strong style={{ color: sugarIntake > 30 ? 'var(--danger)' : 'var(--success)' }}>
+                                        {sugarIntake} Gram
+                                    </strong>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="80"
+                                    step="5"
+                                    value={sugarIntake}
+                                    onChange={(e) => setSugarIntake(parseInt(e.target.value))}
+                                    className="custom-range-slider"
+                                />
+                                <div className="range-hints">
+                                    <span>Bebas Gula</span>
+                                    <span style={{ color: 'var(--danger)' }}>Batas Maksimal Kemenkes (50g)</span>
+                                </div>
+                            </div>
+
+                            {/* Exercise time slider */}
+                            <div className="form-group">
+                                <div className="slider-label-row">
+                                    <label>Durasi Olahraga/Fisik</label>
+                                    <strong className="text-primary">{exerciseTime} Menit</strong>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="90"
+                                    step="5"
+                                    value={exerciseTime}
+                                    onChange={(e) => setExerciseTime(parseInt(e.target.value))}
+                                    className="custom-range-slider"
+                                />
+                                <div className="range-hints">
+                                    <span>Rebahan</span>
+                                    <span>Sangat Aktif (60+ m)</span>
+                                </div>
+                            </div>
+
+                            {/* Eat Fruit Checkbox */}
+                            <div className="form-group-checkbox">
+                                <label className="checkbox-container">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={eatFruit} 
+                                        onChange={(e) => setEatFruit(e.target.checked)} 
+                                    />
+                                    <span className="checkmark"></span>
+                                    <span className="checkbox-text">Saya mengonsumsi buah/sayur segar hari ini</span>
+                                </label>
+                            </div>
+
+                            {/* Journal Text */}
+                            <div className="form-group">
+                                <label className="block-label">Catatan Tambahan Minuman & Makanan</label>
+                                <textarea
+                                    rows="3"
+                                    placeholder="Tulis minuman/makanan manis apa saja yang kamu konsumsi hari ini, atau catatan komitmen sehatmu..."
+                                    value={journalText}
+                                    onChange={(e) => setJournalText(e.target.value)}
+                                    maxLength="300"
+                                />
+                            </div>
+
+                            {/* Save Button */}
+                            <button
+                                className="btn-primary checkin-save-btn"
+                                onClick={handleSave}
+                                disabled={isSaving}
+                            >
+                                {isSaving ? 'Menyimpan...' : 'Simpan Laporan Harian (+25 XP)'}
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="saved-success-state animate-fade-in">
+                            <span className="emoji-celebrate">🎉</span>
+                            <h3>Catatan Hari Ini Berhasil Disimpan!</h3>
+                            <p>Skor XP nutrisi Anda telah meningkat. Grafik asupan gula mingguan akan diperbarui secara otomatis.</p>
+                            <button className="btn-primary" onClick={() => navigate('/progress')}>
+                                Lihat Progres Grafik Gula
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* TAB 2: PROGRAM GAYA HIDUP SEHAT */}
+            {activeTab === 'program' && (
+                <div className="program-card glass-card">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                        <BookOpen size={24} color="var(--primary)" />
+                        <h2 className="title" style={{ margin: 0 }}>Panduan Pola Hidup Sehat 7 Hari</h2>
+                    </div>
+                    <p className="subtitle">
+                        Ikuti misi harian untuk melatih kebiasaan sehat mengurangi minuman manis. Dapatkan +20 XP untuk setiap hari yang berhasil diselesaikan!
+                    </p>
+
+                    <div className="program-grid">
+                        {PROGRAM_DAYS.map((day) => {
+                            const isCompleted = completedDays[day.day];
+                            return (
+                                <div key={day.day} className={`program-day-card ${isCompleted ? 'completed' : ''}`}>
+                                    <div className="day-card-header">
+                                        <span className="day-number">HARI 0{day.day}</span>
+                                        <label className="program-checkbox-container">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={!!isCompleted} 
+                                                onChange={() => toggleProgramDay(day.day)} 
+                                            />
+                                            <span className="program-checkmark"></span>
+                                        </label>
+                                    </div>
+                                    
+                                    <h4 className="day-title">{day.title}</h4>
+                                    <p className="day-desc">{day.desc}</p>
+                                    
+                                    <div className="day-tip-box">
+                                        <strong>Fakta Sehat:</strong> {day.tip}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

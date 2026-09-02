@@ -5,6 +5,8 @@
     position: relative;
     background-color: transparent;
     width: 100%;
+        min-width: 0;
+        min-height: 0;
 }
 
 /* Header */
@@ -12,10 +14,12 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 16px;
-    background: rgba(255, 255, 255, 0.85);
-    backdrop-filter: blur(12px);
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    padding: 16px 20px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow: var(--glass-shadow);
     position: sticky;
     top: 0;
     z-index: 10;
@@ -42,28 +46,39 @@
 }
 
 .chat-logo-mini {
-    width: 36px;
-    height: 36px;
-    background: white;
-    border-radius: 10px;
+    width: 40px;
+    height: 40px;
+    background: var(--accent-gradient);
+    border-radius: var(--border-radius-sm);
     display: flex;
     justify-content: center;
     align-items: center;
     font-size: 20px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    box-shadow: var(--shadow-md);
+    color: transparent;
+    background-image: url('../assets/LOGO RANSTAL.webp');
+    background-size: 76%;
+    background-repeat: no-repeat;
+    background-position: center;
 }
 
 .chat-header-text h2 {
-    font-size: 15px;
-    color: #123e42;
+    font-size: 16px;
+    font-weight: 800;
+    background: var(--accent-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
     margin: 0;
     line-height: 1.2;
+    letter-spacing: -0.3px;
 }
 
 .chat-header-text p {
-    font-size: 11px;
-    color: #64748b;
+    font-size: 12px;
+    color: var(--text-muted);
     margin: 0;
+    font-weight: 500;
 }
 
 .icon-btn-rounded {
@@ -103,6 +118,7 @@
     max-width: 90%;
     /* Increased max width for better readability on narrow screens */
     animation: fadeIn 0.3s ease-out;
+        min-width: 0;
 }
 
 .message-wrapper.bot {
@@ -125,6 +141,11 @@
     font-size: 14px;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
     flex-shrink: 0;
+    color: transparent;
+    background-image: url('../assets/LOGO RANSTAL.webp');
+    background-size: 78%;
+    background-repeat: no-repeat;
+    background-position: center;
 }
 
 .message-bubble {
@@ -135,7 +156,10 @@
     position: relative;
     word-wrap: break-word;
     white-space: pre-wrap;
+    max-height: none;
+    overflow: visible;
     /* For line breaks to show */
+        max-width: 100%;
 }
 
 .bubble-bot {
@@ -314,6 +338,24 @@
     min-width: 0;
     /* Prevent input from expanding container */
 }
+
+    @media (min-width: 769px) {
+        .chat-container { height: calc(100vh - var(--bottom-nav-height)); min-height: 620px; }
+        .messages-area { padding: 24px clamp(24px, 5vw, 72px); }
+        .message-wrapper { max-width: min(78%, 760px); }
+        .chat-input-wrapper { padding: 16px clamp(24px, 5vw, 72px); }
+    }
+
+    @media (max-width: 480px) {
+        .chat-header { padding: 10px 12px; }
+        .messages-area { padding: 12px 10px; gap: 12px; }
+        .message-wrapper { max-width: 94%; gap: 6px; }
+        .message-bubble { padding: 10px 12px; font-size: 13px; line-height: 1.55; }
+        .message-avatar { width: 24px; height: 24px; }
+        .chat-input-wrapper { padding: 10px 8px calc(10px + env(safe-area-inset-bottom)); }
+        .suggestion-chip { padding: 7px 12px; font-size: 12px; }
+        .input-bar input { font-size: 16px; }
+    }
 
 .input-bar input::placeholder {
     color: #94a3b8;

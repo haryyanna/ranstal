@@ -1,30 +1,30 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Home, Send, Sparkles } from 'lucide-react';
+import { Send } from 'lucide-react';
+import { chatCompletion } from '../lib/nutriApi';
 import './Chat.css';
-
-// ==========================================
-// API KEY GEMINI DIAMBIL DARI FILE .env
-// ==========================================
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 const INITIAL_MESSAGES = [
     {
         id: 1,
         sender: 'bot',
-        text: 'Halo! Aku MOODIFY. Aku adalah AI asisten pendamping kesehatan mentalmu. Bagaimana perasaanmu hari ini?',
+        text: 'Halo! Aku Ranstal AI, asisten Travel Health Nursing untuk keselamatan anak selama perjalanan wisata. Aku bisa membantu pertolongan pertama, tips kesehatan perjalanan, panduan obat, dan memberi langkah praktis yang aman.',
     }
 ];
 
 const SUGGESTIONS = [
-    "Aku merasa sedih hari ini",
-    "Coba teknik pernapasan",
-    "Aku merasa cemas",
-    "Bagaimana cara journaling?"
+    "Pertolongan pertama muntah perjalanan",
+    "Tips mencegah mabuk perjalanan",
+    "Obat apa yang wajib dibawa?",
+    "Cara menjaga kebersihan saat wisata"
 ];
+    const CHAT_REFERENCES = '\n\nReferensi:\n- Kemenkes RI, Pedoman Gizi Seimbang: https://ayosehat.kemkes.go.id/pedoman-gizi-seimbang\n- WHO, Guideline: Sugars intake for adults and children: https://www.who.int/publications/i/item/9789241549028\n- USDA FoodData Central, basis data komposisi pangan: https://fdc.nal.usda.gov/';
+
+    const withReferences = (text) => {
+        const answer = String(text || '').trim();
+        return answer.toLowerCase().includes('referensi:') ? answer : `${answer}${CHAT_REFERENCES}`;
+    };
 
 const Chat = () => {
-    const navigate = useNavigate();
     const [messages, setMessages] = useState(INITIAL_MESSAGES);
     const [inputText, setInputText] = useState('');
     const [isTyping, setIsTyping] = useState(false);
@@ -47,7 +47,7 @@ const Chat = () => {
                 const savedData = localStorage.getItem(userKey);
                 if (savedData) {
                     const userData = JSON.parse(savedData);
-                    if (userData.chatHistory && userData.chatHistory.length > 0) {
+                    if (userData.chatHistory && userData.chatHistory.length > 0 && userData.chatHistory[0].text.includes('Ranstal AI')) {
                         setMessages(userData.chatHistory);
                     } else {
                         // Custom initial greeting with username
@@ -55,11 +55,10 @@ const Chat = () => {
                             {
                                 id: 1,
                                 sender: 'bot',
-                                text: `Halo ${username}! Aku MOODIFY. Aku adalah AI asisten pendamping kesehatan mentalmu. Bagaimana perasaanmu hari ini?`,
+                                text: `Halo ${username}! Aku Ranstal AI, asisten Travel Health Nursing untuk keselamatan anak selama perjalanan wisata. Aku bisa membantu pertolongan pertama, tips kesehatan perjalanan, panduan obat, dan memberi langkah praktis yang aman.`,
                             }
                         ];
                         setMessages(personalizedGreeting);
-                        // Save initial greeting to history
                         userData.chatHistory = personalizedGreeting;
                         localStorage.setItem(userKey, JSON.stringify(userData));
                     }
@@ -88,74 +87,80 @@ const Chat = () => {
         }
     };
 
-    const getGeminiResponse = async (userText, history) => {
-        if (!GEMINI_API_KEY || GEMINI_API_KEY.length < 10 || GEMINI_API_KEY === "MASUKKAN_API_KEY_DI_SINI") {
-            return "⚠️ Error: API Key Gemini belum dimasukkan dengan benar di dalam kode (variabel `GEMINI_API_KEY`).";
-        }
-
+    const playSendSound = () => {
         try {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.1);
+            gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1);
+        } catch (e) {
+            console.error("Audio play failed", e);
+        }
+    };
 
-            // Build conversation history format for REST API
+    const getAiResponse = async (userText, history) => {
+        try {
             const formattedHistory = history.map(msg => ({
-                role: msg.sender === 'user' ? 'user' : 'model',
-                parts: [{ text: msg.text }]
+                role: msg.sender === 'user' ? 'user' : 'assistant',
+                content: msg.text
             }));
 
-            // Append current message
             formattedHistory.push({
                 role: 'user',
-                parts: [{ text: userText }]
+                content: userText
             });
 
-            const requestBody = {
-                system_instruction: {
-                    parts: [{ text: "Kamu adalah MOODIFY, sebuah chatbot psikoedukatif berbasis AI untuk remaja. Tugasmu: memberikan dukungan emosional, edukasi kesehatan mental, dan strategi coping. Gaya bahasa: Ramah, empatik, suportif, menggunakan bahasa Indonesia gaul/kasual yang wajar untuk remaja SMA. Jangan memberikan diagnosa medis, sarankan ke profesional jika kondisi berat." }]
-                },
-                contents: formattedHistory
-            };
+            const systemPrompt = "Karaktermu: Ranstal AI, asisten Travel Health Nursing yang ramah, santai, akurat, dan edukatif untuk keselamatan anak selama perjalanan wisata. Jawab sesuai pertanyaan dengan bahasa Indonesia yang mudah dipahami. Berikan minimal satu paragraf yang cukup lengkap, biasanya 4-7 kalimat, tanpa bertele-tele. Bila relevan, gunakan struktur: jawaban inti, alasan/fakta medis, lalu langkah praktis pertolongan pertama atau alternatif aman. Gunakan paling banyak 1-2 emoji. Jangan mendiagnosis atau menggantikan tenaga kesehatan profesional. Selalu prioritaskan keselamatan dan rujuk ke tenaga medis untuk kondisi serius.";
 
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(requestBody)
+            const data = await chatCompletion({
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    ...formattedHistory
+                ],
+                max_tokens: 800,
+                temperature: 0.7
             });
-
-            if (!response.ok) {
-                let errorMessage = response.statusText;
-                try {
-                    const errorData = await response.json();
-                    if (errorData.error && errorData.error.message) {
-                        errorMessage = errorData.error.message;
-                    }
-                } catch (e) { /* ignore json parse error */ }
-
-                console.error("Gemini API Error:", errorMessage);
-                return `⚠️ Gagal menghubungi AI: ${errorMessage}`;
-            }
-
-            const data = await response.json();
-            if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts[0]) {
-                return data.candidates[0].content.parts[0].text;
-            } else {
-                return "⚠️ Menerima respons kosong dari AI.";
-            }
-
+            return data.content?.trim() || getLocalResponseFallback(userText);
+                return withReferences(data.content?.trim() || getLocalResponseFallback(userText));
         } catch (error) {
-            console.error("Fetch Error:", error);
-            return `⚠️ Gagal terhubung: ${error.message}. Pastikan koneksi internet lancar dan tidak ada pemblokiran CORS/ekstensi VPN.`;
+            console.warn('AI chat unavailable; using local nutrition guidance.', error);
+            return getLocalResponseFallback(userText);
+                return withReferences(getLocalResponseFallback(userText));
         }
+    };
+
+    const getLocalResponseFallback = (text) => {
+        const lower = text.toLowerCase();
+        if (lower.includes('mabuk') || lower.includes('mual') || lower.includes('muntah') || lower.includes('perjalanan')) {
+            return "Untuk mencegah mabuk perjalanan, duduk di bagian kendaraan yang stabil (tengah), hindari membaca saat bergerak, dan buka jendela untuk udara segar. Jika sudah mual, istirahatkan pandangan ke horizon jauh. Bawa permen pelega tenggorokan atau jahe. 🚗";
+        }
+        if (lower.includes('obat') || lower.includes('bawa') || lower.includes('sedia')) {
+            return "Obat yang wajib dibawa saat wisata bersama anak: Paracetamol (demam/nyeri), obat anti-mabuk perjalanan, P3K lengkap (plester, antiseptik, kasa), minyak kayu putih, obat diare, dan obat alergi. Simpan di wadah kedap udara yang mudah dijangkau. 💊";
+        }
+        if (lower.includes('pertolongan') || lower.includes('pertolongan pertama') || lower.includes('p3k')) {
+            return "Pertolongan pertama dasar: Untuk luka lecet → bersihkan dengan air mengalir + antiseptik, tutup plester. Untuk demam → kompres hangat + paracetamol sesuai berat badan. Untuk tersedak → hentikan makan, minum air pelan. Jika kondisi memburuk atau anak sulit bernapas, SEGERA ke fasilitas kesehatan terdekat. 🏥";
+        }
+        if (lower.includes('bersih') || lower.includes('cuci tangan') || lower.includes('higiene')) {
+            return "Selama wisata, selalu cuci tangan dengan sabun selama 20 detik sebelum makan dan setelah dari toilet. Bawa hand sanitizer 60%+ alkohol untuk keadaan darurat. Hindari makanan dan minuman yang tidak terjamin kebersihannya, terutama es batu yang tidak jelas sumbernya. 🧼";
+        }
+        return "Pertanyaan menarik tentang kesehatan perjalanan! Untuk jawaban lebih tepat, ceritakan kondisi atau masalahnya secara detail (gejala, durasi, lokasi wisata). Ranstal AI akan membantu memberikan panduan aman untuk keselamatan anak selama perjalanan wisata. 🎒";
     };
 
     const handleSend = async (textToSend = inputText) => {
         if (!textToSend.trim()) return;
+        
+        playSendSound();
 
-        // Capture history before adding current message
         const currentHistory = [...messages];
 
-        // Add user message to UI
         const newMessage = {
             id: messages.length + 1,
             sender: 'user',
@@ -164,13 +169,12 @@ const Chat = () => {
 
         const updatedMessagesWithUser = [...currentHistory, newMessage];
         setMessages(updatedMessagesWithUser);
-        saveMessagesToLocal(updatedMessagesWithUser); // Save after user message
+        saveMessagesToLocal(updatedMessagesWithUser);
 
         setInputText('');
         setIsTyping(true);
 
-        // Get AI Response
-        const aiText = await getGeminiResponse(textToSend, currentHistory);
+        const aiText = await getAiResponse(textToSend, currentHistory);
 
         const botResponse = {
             id: updatedMessagesWithUser.length + 1,
@@ -180,30 +184,23 @@ const Chat = () => {
 
         const finalUpdatedMessages = [...updatedMessagesWithUser, botResponse];
         setMessages(finalUpdatedMessages);
-        saveMessagesToLocal(finalUpdatedMessages); // Save after bot response
+        saveMessagesToLocal(finalUpdatedMessages);
 
         setIsTyping(false);
     };
 
     return (
         <div className="chat-container">
-            {/*... header area ...*/}
             <header className="chat-header">
                 <div className="chat-header-left">
-                    <div className="chat-logo-mini">🤖</div>
+                    <div className="chat-logo-mini">🎒</div>
                     <div className="chat-header-text">
-                        <h2>MOODIFY</h2>
-                        <p>Teman Sehat Mentalmu</p>
+                        <h2>Ranstal AI</h2>
+                        <p>Travel Health Nursing</p>
                     </div>
-                </div>
-                <div className="chat-header-actions">
-                    <button className="icon-btn-rounded" onClick={() => navigate('/home')}>
-                        <Home size={20} />
-                    </button>
                 </div>
             </header>
 
-            {/*... messages area ...*/}
             <div className="messages-area">
                 {messages.map((msg, index) => (
                     <div key={index} className={`message-wrapper ${msg.sender === 'user' ? 'user' : 'bot'}`}>
@@ -232,7 +229,6 @@ const Chat = () => {
                 <div ref={messagesEndRef} />
             </div>
 
-            {/*... input area ...*/}
             <div className="chat-input-wrapper">
                 <div className="suggestions-container">
                     {SUGGESTIONS.map((suggestion, idx) => (
@@ -249,7 +245,7 @@ const Chat = () => {
                 <div className="input-bar">
                     <input
                         type="text"
-                        placeholder="Ceritakan perasaanmu..."
+                        placeholder="Tanya seputar kesehatan perjalanan di sini..."
                         value={inputText}
                         onChange={(e) => setInputText(e.target.value)}
                         onKeyPress={(e) => e.key === 'Enter' && handleSend()}
