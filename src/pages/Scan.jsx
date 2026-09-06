@@ -1,32 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Camera, Sparkles, AlertTriangle, RotateCcw, Upload, Info, SwitchCamera, ScanLine, Lightbulb, BookOpenCheck, ShieldCheck } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Camera, Sparkles, AlertTriangle, RotateCcw, Upload, SwitchCamera, ScanLine, Lightbulb, BookOpenCheck } from 'lucide-react';
 import { enqueueSheetsBackup } from '../lib/sheetsBackup';
+import { analyzeDrinkImage } from '../lib/nutriApi';
 import { VERIFIED_FOODS, findVerifiedFood, normalizeFoodData } from '../../data/verifiedFoods';
 import './Scan.css';
-
-const buildUnrecognizedFood = () => ({
-  id: 'unknown-object',
-  name: 'Objek tidak teridentifikasi',
-  category: 'Bukan makanan',
-  emoji: '❓',
-  grade: 'C',
-  gradeColor: '#ef4444',
-  status: 'Bukan Makanan',
-  isFood: false,
-  safetyTips: 'Objek yang dipindai bukan makanan yang dapat dikonsumsi. Pastikan Anda memindai makanan yang benar-benar layak dimakan.',
-  allergens: 'Tidak ada',
-  nutritionList: [
-    { label: 'Klasifikasi', value: 'Bukan makanan', desc: 'Butuh pengecekan ulang' },
-    { label: 'Tindakan', value: 'Pindai makanan', desc: 'Fokus pada objek yang dapat dimakan' },
-    { label: 'Keamanan', value: 'Perlu verifikasi', desc: 'Jangan dikonsumsi sebelum jelas' }
-  ],
-  servingRecommendation: 'Pastikan objek yang dipindai adalah makanan yang aman dan layak dikonsumsi sebelum dibawa ke mulut.',
-  additionalRecommendations: [
-    'Ulangi pemindaian dengan fokus pada makanan yang jelas terlihat.',
-    'Hindari memindai benda non-makanan seperti alat, mainan, atau benda kecil lain.',
-    'Pilih makanan yang masih bersih, matang, dan sesuai usia anak.'
-  ]
-});
 
 const Scan = () => {
   const videoRef = useRef(null), canvasRef = useRef(null), inputRef = useRef(null), streamRef = useRef(null);
@@ -122,35 +99,16 @@ const Scan = () => {
     }, 900);
 
     try {
-      let food = null;
-
-      // PERBAIKAN: Prioritas 1 - Jika user pilih makanan dari tombol
-      if (selectedFoodId && String(selectedFoodId).trim()) {
-        console.log('Mencari makanan dengan ID:', selectedFoodId);
-        const foundFood = VERIFIED_FOODS.find((item) => item?.id === selectedFoodId);
-        
-        if (foundFood) {
-          console.log('Makanan ditemukan:', foundFood);
-          food = normalizeFoodData({ ...foundFood, source: 'Database Makanan Ranstal' });
-        } else {
-          console.log('Makanan dengan ID tidak ditemukan');
-        }
-      }
-
-      // PERBAIKAN: Prioritas 2 - Jika masih tidak ada, coba search
-      if (!food && selectedFoodId) {
-        const searchResult = findVerifiedFood(selectedFoodId);
-        if (searchResult) {
-          console.log('Makanan ditemukan dari search:', searchResult);
-          food = normalizeFoodData({ ...searchResult, source: 'Database Makanan Ranstal' });
-        }
-      }
-
-      // PERBAIKAN: Fallback - Jika masih tidak ada hasil
-      if (!food) {
-        console.log('Tidak ada makanan terdeteksi, menampilkan unrecognized');
-        food = buildUnrecognizedFood();
-      }
+      const selectedFood = VERIFIED_FOODS.find((item) => item?.id === selectedFoodId);
+      const matchedFood = selectedFood || findVerifiedFood(selectedFoodId || 'makanan');
+      const result = await analyzeDrinkImage({
+        imageB64: photo,
+        searchHint: matchedFood?.name || '',
+        drinkKey: selectedFoodId
+      });
+      const valueToAnalyze = result?.result || matchedFood;
+      if (!valueToAnalyze) throw new Error('Makanan belum teridentifikasi. Pilih jenis makanan yang paling sesuai, lalu coba lagi.');
+      const food = normalizeFoodData({ ...valueToAnalyze, source: result?.source || 'Database Makanan Ranstal' });
 
       setScannedFood(food);
       setProgress(100);
