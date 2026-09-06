@@ -191,15 +191,24 @@ const VERIFIED_FOODS = [
 ];
 
 const findVerifiedFood = (searchTerm) => {
-  const term = String(searchTerm ?? '').toLowerCase().trim();
+  const term = String(searchTerm ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (!term) return undefined;
 
   const match = VERIFIED_FOODS.find((food) => {
     const normalized = normalizeFoodData(food);
     const name = String(normalized?.name ?? '').toLowerCase();
     const searchTerms = Array.isArray(normalized?.searchTerms) ? normalized.searchTerms : [];
+    const aliases = [name, ...searchTerms.map((item) => String(item ?? '').toLowerCase())]
+      .map((item) => item.replace(/[^a-z0-9\s-]/g, ' ').replace(/\s+/g, ' ').trim())
+      .filter(Boolean);
+    const termWords = term.split(' ').filter((word) => word.length > 2);
 
-    return name.includes(term) || searchTerms.some((item) => String(item ?? '').toLowerCase().includes(term));
+    return aliases.some((alias) => alias.includes(term) || term.includes(alias))
+      || (termWords.length > 0 && aliases.some((alias) => termWords.every((word) => alias.includes(word))));
   });
 
   return match ? normalizeFoodData(match) : undefined;

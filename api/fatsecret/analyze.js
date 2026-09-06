@@ -15,6 +15,14 @@ const GEMINI_VISION_MODELS = ['gemini-3.5-flash-lite', 'gemini-flash-lite-latest
 const getCerebrasKey = () => globalThis.process?.env?.CEREBRAS_API_KEY || globalThis.process?.env?.VITE_CEREBRAS_API_KEY || '';
 const getGeminiKey = () => globalThis.process?.env?.GEMINI_API_KEY || globalThis.process?.env?.VITE_GEMINI_API_KEY || '';
 
+const cleanVisionLabel = (value) => String(value || '')
+  .replace(/^(hasil|objek|makanan|minuman)\s*[:-]\s*/i, '')
+  .replace(/["'`]/g, '')
+  .replace(/\s+/g, ' ')
+  .trim()
+  .split(/[.!?\n]/)[0]
+  .trim();
+
 const resolveLocalDrink = (value) => {
   const normalized = String(value || '').toLowerCase();
   if (/(lemon|infused|air lemon)/i.test(normalized)) return VERIFIED_DRINKS.find((drink) => drink.id === 'lemon-water');
@@ -76,7 +84,7 @@ const identifyImageWithGemini = async (imageB64) => {
 
       const data = await response.json();
       if (!response.ok) throw new Error(data?.error?.message || 'Gemini Vision API error');
-      const answer = String(data?.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('') || '').trim().toLowerCase();
+      const answer = cleanVisionLabel(data?.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('')).toLowerCase();
       if (!answer || answer.includes('unknown')) return null;
       return answer;
     } catch (error) {
