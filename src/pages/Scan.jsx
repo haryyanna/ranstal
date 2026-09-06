@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Camera, Sparkles, AlertTriangle, RotateCcw, Upload, Info, SwitchCamera, ScanLine, Lightbulb, BookOpenCheck, ShieldCheck } from 'lucide-react';
 import { enqueueSheetsBackup } from '../lib/sheetsBackup';
-import { VERIFIED_FOODS, findVerifiedFood, normalizeFoodData } from '../data/verifiedFoods';
+import { VERIFIED_FOODS, findVerifiedFood, normalizeFoodData } from '../../data/verifiedFoods';
 import './Scan.css';
 
 const buildUnrecognizedFood = () => ({
@@ -106,7 +106,7 @@ const Scan = () => {
       enqueueSheetsBackup({ eventType: 'food_scan', username, payload: scan });
     } catch (error) { console.warn('Tidak dapat menyimpan riwayat scan', error); }
   };
-  
+
   const startAnalysis = async () => {
     if (!photo) return;
     setCameraState('scanning');
@@ -124,16 +124,15 @@ const Scan = () => {
     try {
       let food = null;
 
-      // PERBAIKAN: Jika user pilih makanan secara manual
+      // Jika user memilih makanan dari list
       if (selectedFoodId && selectedFoodId.trim()) {
-        // Cari di VERIFIED_FOODS berdasarkan ID
         const selectedFood = VERIFIED_FOODS.find((item) => item?.id === selectedFoodId);
         if (selectedFood) {
           food = normalizeFoodData({ ...selectedFood, source: 'Database Makanan Ranstal' });
         }
       }
 
-      // PERBAIKAN: Jika belum ketemu dan user belum pilih manual, gunakan unrecognized
+      // Fallback jika makanan tidak ditemukan
       if (!food) {
         food = buildUnrecognizedFood();
       }
@@ -151,7 +150,7 @@ const Scan = () => {
       window.clearInterval(timer);
     }
   };
-  
+
   const resetScanner = () => { setPhoto(''); setProgress(0); setScannedFood(null); startCamera(); };
   const food = scannedFood;
   const safetyInterpretation = food?.status === 'Sangat Aman'
