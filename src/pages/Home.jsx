@@ -340,6 +340,7 @@ const Home = () => {
                     <Sparkles size={14} className="badge-icon" />
                     <span>Halo, {username}!</span>
                 </div>
+                <p className="home-watermark">karya Siswa SMA Negeri 1 Blahbatuh</p>
 
                 <div className="hero-brand" aria-label="RANSTAL">
                     <img src={ranstalLogo} alt="Logo RANSTAL" />
