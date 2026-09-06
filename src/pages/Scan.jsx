@@ -124,16 +124,31 @@ const Scan = () => {
     try {
       let food = null;
 
-      // Jika user memilih makanan dari list
-      if (selectedFoodId && selectedFoodId.trim()) {
-        const selectedFood = VERIFIED_FOODS.find((item) => item?.id === selectedFoodId);
-        if (selectedFood) {
-          food = normalizeFoodData({ ...selectedFood, source: 'Database Makanan Ranstal' });
+      // PERBAIKAN: Prioritas 1 - Jika user pilih makanan dari tombol
+      if (selectedFoodId && String(selectedFoodId).trim()) {
+        console.log('Mencari makanan dengan ID:', selectedFoodId);
+        const foundFood = VERIFIED_FOODS.find((item) => item?.id === selectedFoodId);
+        
+        if (foundFood) {
+          console.log('Makanan ditemukan:', foundFood);
+          food = normalizeFoodData({ ...foundFood, source: 'Database Makanan Ranstal' });
+        } else {
+          console.log('Makanan dengan ID tidak ditemukan');
         }
       }
 
-      // Fallback jika makanan tidak ditemukan
+      // PERBAIKAN: Prioritas 2 - Jika masih tidak ada, coba search
+      if (!food && selectedFoodId) {
+        const searchResult = findVerifiedFood(selectedFoodId);
+        if (searchResult) {
+          console.log('Makanan ditemukan dari search:', searchResult);
+          food = normalizeFoodData({ ...searchResult, source: 'Database Makanan Ranstal' });
+        }
+      }
+
+      // PERBAIKAN: Fallback - Jika masih tidak ada hasil
       if (!food) {
+        console.log('Tidak ada makanan terdeteksi, menampilkan unrecognized');
         food = buildUnrecognizedFood();
       }
 
@@ -143,6 +158,7 @@ const Scan = () => {
       setCameraState('result');
       setCameraError('');
     } catch (error) {
+      console.error('Error saat analisis:', error);
       const message = error?.message || 'Makanan belum teridentifikasi. Pilih jenis makanan yang paling sesuai, lalu coba lagi.';
       setCameraError(message);
       setCameraState('preview');
@@ -151,7 +167,7 @@ const Scan = () => {
     }
   };
 
-  const resetScanner = () => { setPhoto(''); setProgress(0); setScannedFood(null); startCamera(); };
+  const resetScanner = () => { setPhoto(''); setProgress(0); setScannedFood(null); setSelectedFoodId(''); startCamera(); };
   const food = scannedFood;
   const safetyInterpretation = food?.status === 'Sangat Aman'
     ? 'Makanan ini sangat aman untuk dikonsumsi anak selama perjalanan wisata. Tinggi nutrisi dan rendah risiko.'
