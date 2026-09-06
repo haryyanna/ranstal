@@ -101,12 +101,21 @@ const Scan = () => {
     try {
       const selectedFood = VERIFIED_FOODS.find((item) => item?.id === selectedFoodId);
       const matchedFood = selectedFood || findVerifiedFood(selectedFoodId || 'makanan');
-      const result = await analyzeDrinkImage({
-        imageB64: photo,
-        searchHint: matchedFood?.name || '',
-        drinkKey: selectedFoodId
-      });
+      let result = null;
+      let analysisError = null;
+      try {
+        result = await analyzeDrinkImage({
+          imageB64: photo,
+          searchHint: matchedFood?.name || '',
+          drinkKey: selectedFoodId
+        });
+      } catch (error) {
+        analysisError = error;
+      }
       const valueToAnalyze = result?.result || matchedFood;
+      if (!valueToAnalyze && analysisError) {
+        throw new Error(`Layanan scan belum tersedia (${analysisError.message}). Pilih jenis makanan di atas agar data gizi tetap dapat ditampilkan.`);
+      }
       if (!valueToAnalyze) throw new Error('Makanan belum teridentifikasi. Pilih jenis makanan yang paling sesuai, lalu coba lagi.');
       const food = normalizeFoodData({ ...valueToAnalyze, source: result?.source || 'Database Makanan Ranstal' });
 
