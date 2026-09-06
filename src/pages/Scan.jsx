@@ -12,7 +12,7 @@ const Scan = () => {
   const [cameraError, setCameraError] = useState('');
   const [hasFlash, setHasFlash] = useState(false);
   const [photo, setPhoto] = useState(''), [selectedFoodId, setSelectedFoodId] = useState('');
-  const [showAllFoods, setShowAllFoods] = useState(false);
+  const [showAllFoods, setShowAllFoods] = useState(false), [foodSearch, setFoodSearch] = useState('');
   const [scanSteps, setScanSteps] = useState(''), [progress, setProgress] = useState(0), [scannedFood, setScannedFood] = useState(null);
 
   const stopCamera = useCallback(() => { streamRef.current?.getTracks().forEach((track) => track.stop()); streamRef.current = null; }, []);
@@ -135,6 +135,12 @@ const Scan = () => {
   };
 
   const resetScanner = () => { setPhoto(''); setProgress(0); setScannedFood(null); setSelectedFoodId(''); startCamera(); };
+  const normalizedFoodSearch = foodSearch.trim().toLowerCase();
+  const visibleFoods = VERIFIED_FOODS.filter((item) => {
+    if (!normalizedFoodSearch) return showAllFoods || VERIFIED_FOODS.indexOf(item) < 5;
+    const terms = [item.name, ...(item.terms || []), ...(item.searchTerms || [])].join(' ').toLowerCase();
+    return terms.includes(normalizedFoodSearch);
+  });
   const food = scannedFood;
   const safetyInterpretation = food?.status === 'Sangat Aman'
     ? 'Makanan ini sangat aman untuk dikonsumsi anak selama perjalanan wisata. Tinggi nutrisi dan rendah risiko.'
@@ -155,9 +161,16 @@ const Scan = () => {
       </header>
       
       <div className="drink-selector-wrapper">
-        <label>Bantuan identifikasi (opsional bila foto kurang jelas)</label>
+        <label>Pilih makanan jika scan otomatis belum tersedia</label>
+        <input
+          className="food-search-input"
+          value={foodSearch}
+          onChange={(event) => setFoodSearch(event.target.value)}
+          placeholder="Cari nasi, apel, ayam, buah..."
+          aria-label="Cari makanan"
+        />
         <div className="selector-grid">
-          {(showAllFoods ? VERIFIED_FOODS : VERIFIED_FOODS.slice(0, 5)).map((item) => (
+          {visibleFoods.map((item) => (
             <button 
               key={item.id} 
               className={`select-chip ${selectedFoodId === item.id ? 'active' : ''}`} 
@@ -167,13 +180,14 @@ const Scan = () => {
             </button>
           ))}
         </div>
-        <button 
+        {!normalizedFoodSearch && <button 
           type="button" 
           className="toggle-drinks-btn" 
           onClick={() => setShowAllFoods((value) => !value)}
         >
           {showAllFoods ? 'Tampilkan lebih sedikit' : `Tampilkan selengkapnya (${VERIFIED_FOODS.length - 5} lainnya)`}
-        </button>
+        </button>}
+        {normalizedFoodSearch && visibleFoods.length === 0 && <p className="food-search-empty">Makanan belum ada di katalog. Coba kata lain atau gunakan backend scan otomatis.</p>}
       </div>
       
       <button 
