@@ -17,6 +17,6 @@ Untuk checklist deploy lengkap (env + verifikasi), lihat `VERCEL_CHECKLIST.md`.
 
 ## Deploy GitHub Pages tanpa backend
 
-Scan tetap dapat mengenali kandidat makanan tanpa Vercel melalui model visi yang berjalan di browser dan mencocokkan foto dengan katalog makanan lokal. Pada pemakaian pertama, browser mengunduh model dari Hugging Face (sekitar 190 MB); koneksi internet diperlukan. Setelah itu, foto diproses di perangkat. Hasil otomatis ditampilkan sebagai prediksi visual agar pengguna dapat memastikan nama makanan sebelum membaca nutrisinya. Kecocokan dapat lebih rendah untuk makanan yang tidak ada di katalog atau hidangan lokal yang jarang.
+Scan tetap dapat mengenali makanan tanpa Vercel melalui model klasifikasi ringan yang berjalan di browser. Pada pemakaian pertama, browser mengunduh model dari Hugging Face (sekitar 21,5 MB); koneksi internet diperlukan. Setelah itu, foto diproses di perangkat. Hasil otomatis ditampilkan sebagai prediksi visual agar pengguna dapat memastikan nama makanan sebelum membaca nutrisinya. Pengenalan cepat mencakup kelas umum yang dikenali model; untuk makanan yang tidak dikenali, pilih nama yang sesuai dari katalog.
 
 Untuk menerbitkan ke URL GitHub Pages yang sama, buka `Settings -> Pages`, pilih `GitHub Actions` sebagai sumber deploy, lalu push ke branch `main`. Workflow `.github/workflows/pages.yml` akan build dan menerbitkan situs.

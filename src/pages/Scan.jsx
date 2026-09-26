@@ -128,19 +128,24 @@ const Scan = () => {
       let result = null;
       let analysisError = null;
       let browserRecognition = null;
-      try {
-        result = await analyzeDrinkImage({
-          imageB64: photo,
-          searchHint: matchedFood?.name || '',
-          drinkKey: selectedFoodId
-        });
-      } catch (error) {
-        analysisError = error;
+      // GitHub Pages only hosts static files; its missing API route can time
+      // out before browser recognition starts. Go straight to the local path.
+      const hasSameOriginApi = !window.location.hostname.endsWith('github.io');
+      if (hasSameOriginApi) {
+        try {
+          result = await analyzeDrinkImage({
+            imageB64: photo,
+            searchHint: matchedFood?.name || '',
+            drinkKey: selectedFoodId
+          });
+        } catch (error) {
+          analysisError = error;
+        }
       }
       if (!result?.result && !matchedFood) {
         try {
           usingBrowserRecognition = true;
-          setScanSteps('Menyiapkan model pengenalan di perangkat (unduhan pertama bisa memerlukan waktu)...');
+          setScanSteps('Menyiapkan model ringan di perangkat (unduhan pertama sekitar 21,5 MB)...');
           browserRecognition = await recognizeFoodInBrowser(photo);
         } catch (error) {
           console.warn('Pengenalan makanan di browser gagal:', error);
