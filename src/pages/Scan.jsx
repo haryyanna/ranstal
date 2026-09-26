@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Camera, Sparkles, AlertTriangle, RotateCcw, Upload, SwitchCamera, ScanLine, Lightbulb, BookOpenCheck } from 'lucide-react';
 import { enqueueSheetsBackup } from '../lib/sheetsBackup';
 import { analyzeDrinkImage } from '../lib/nutriApi';
-import { recognizeFoodInBrowser } from '../lib/browserFoodRecognition';
+import { prepareBrowserFoodRecognition, recognizeFoodInBrowser } from '../lib/browserFoodRecognition';
 import { VERIFIED_FOODS, findVerifiedFood, normalizeFoodData } from '../../data/verifiedFoods';
 import './Scan.css';
 
@@ -15,6 +15,7 @@ const Scan = () => {
   const [photo, setPhoto] = useState(''), [selectedFoodId, setSelectedFoodId] = useState('');
   const [showAllFoods, setShowAllFoods] = useState(false), [foodSearch, setFoodSearch] = useState('');
   const [scanSteps, setScanSteps] = useState(''), [progress, setProgress] = useState(0), [scannedFood, setScannedFood] = useState(null);
+  const [recognizerReady, setRecognizerReady] = useState(false);
 
   const stopCamera = useCallback(() => { streamRef.current?.getTracks().forEach((track) => track.stop()); streamRef.current = null; }, []);
   const startCamera = useCallback(async () => {
@@ -32,6 +33,13 @@ const Scan = () => {
     }
   }, [facingMode, stopCamera]);
   useEffect(() => { startCamera(); return stopCamera; }, [startCamera, stopCamera]);
+  useEffect(() => {
+    let active = true;
+    prepareBrowserFoodRecognition()
+      .then(() => { if (active) setRecognizerReady(true); })
+      .catch((error) => console.warn('Model pengenalan makanan belum siap:', error));
+    return () => { active = false; };
+  }, []);
 
   const capturePhoto = () => {
     const video = videoRef.current, canvas = canvasRef.current;
@@ -145,8 +153,8 @@ const Scan = () => {
       if (!result?.result && !matchedFood) {
         try {
           usingBrowserRecognition = true;
-          setScanSteps('Menyiapkan model ringan di perangkat (unduhan pertama sekitar 21,5 MB)...');
-          browserRecognition = await recognizeFoodInBrowser(photo);
+          setScanSteps('Memeriksa foto dengan pengenalan di perangkat...');
+          browserRecognition = await recognizeFoodInBrowser(photo, setScanSteps);
         } catch (error) {
           console.warn('Pengenalan makanan di browser gagal:', error);
         }
@@ -247,7 +255,7 @@ const Scan = () => {
             </div>
             <div className="camera-bar-top">
               <button onClick={toggleFlash} className={`icon-btn ${hasFlash ? 'text-amber' : ''}`} title="Flash">⚡</button>
-              <span className="cam-status">KAMERA AKTIF</span>
+              <span className="cam-status">{recognizerReady ? 'KAMERA & SCAN SIAP' : 'KAMERA AKTIF · MENYIAPKAN SCAN'}</span>
               <button className="icon-btn" onClick={() => setFacingMode((mode) => mode === 'environment' ? 'user' : 'environment')} title="Ganti kamera">
                 <SwitchCamera size={18} />
               </button>

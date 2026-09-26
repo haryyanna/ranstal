@@ -1,26 +1,43 @@
 import { VERIFIED_FOODS } from '../../data/verifiedFoods';
 
-// MobileViT-XXS is a small ImageNet classifier (~21.5 MB) that is much faster
-// to download than the previous zero-shot CLIP model (~190 MB).
-const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0';
-const MODEL_ID = 'Xenova/mobilevit-xx-small';
+// The first model is compact and covers common objects. Food-101 is loaded
+// only if that model cannot map the image to the local catalog.
+const TRANSFORMERS_URL = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0';
+const QUICK_MODEL = 'Xenova/mobilevit-xx-small';
+const FOOD_MODEL = 'onnx-community/swin-finetuned-food101-ONNX';
 
-let classifierPromise;
+let transformersPromise;
+const classifierPromises = new Map();
 
-const getClassifier = () => {
-  if (!classifierPromise) {
-    classifierPromise = import(/* @vite-ignore */ MODEL_URL)
-      .then(({ env, pipeline }) => {
-        env.allowLocalModels = false;
-        return pipeline('image-classification', MODEL_ID);
+const getTransformers = () => {
+  if (!transformersPromise) {
+    transformersPromise = import(/* @vite-ignore */ TRANSFORMERS_URL)
+      .then((transformers) => {
+        transformers.env.allowLocalModels = false;
+        return transformers;
       })
       .catch((error) => {
-        classifierPromise = null;
+        transformersPromise = null;
         throw error;
       });
   }
-  return classifierPromise;
+  return transformersPromise;
 };
+
+const getClassifier = (modelId, options = {}) => {
+  if (!classifierPromises.has(modelId)) {
+    const promise = getTransformers()
+      .then(({ pipeline }) => pipeline('image-classification', modelId, options))
+      .catch((error) => {
+        classifierPromises.delete(modelId);
+        throw error;
+      });
+    classifierPromises.set(modelId, promise);
+  }
+  return classifierPromises.get(modelId);
+};
+
+export const prepareBrowserFoodRecognition = () => getClassifier(QUICK_MODEL);
 
 const normalize = (value) => String(value || '')
   .toLowerCase()
@@ -29,8 +46,8 @@ const normalize = (value) => String(value || '')
   .replace(/[^a-z0-9]+/g, ' ')
   .trim();
 
-// MobileViT uses ImageNet class names (for example, "French loaf"), which do
-// not always use the same wording as Ranstal's Indonesian food catalog.
+// Map model-specific class names to the closest matching verified catalog item.
+// Keep these explicit: generic labels such as "plate" must never become food.
 const MODEL_LABEL_FOOD_IDS = new Map([
   ['loaf', 'roti-tawar'],
   ['french loaf', 'roti-tawar'],
@@ -42,13 +59,31 @@ const MODEL_LABEL_FOOD_IDS = new Map([
   ['brown bread', 'roti-gandum'],
   ['wholemeal bread', 'roti-gandum'],
   ['wheat bread', 'roti-gandum'],
+  ['french toast', 'roti-bakar'],
+  ['garlic bread', 'roti-bakar'],
+  ['bread pudding', 'puding'],
   ['granny smith', 'apel'],
-  ['banana', 'pisang-ambon']
+  ['banana', 'pisang-ambon'],
+  ['bunch of bananas', 'pisang-ambon'],
+  ['mashed potato', 'kentang-rebus'],
+  ['boiled potato', 'kentang-rebus'],
+  ['brown rice', 'nasi-merah'],
+  ['rice', 'nasi-putih'],
+  ['fried chicken', 'ayam-goreng'],
+  ['chicken wings', 'ayam-goreng'],
+  ['omelette', 'telur-dadar'],
+  ['frozen yogurt', 'yogurt'],
+  ['guacamole', 'alpukat'],
+  ['grilled salmon', 'ikan-bakar'],
+  ['water bottle', 'air-mineral'],
+  ['bottle of water', 'air-mineral'],
+  ['mineral water bottle', 'air-mineral'],
+  ['milk bottle', 'susu-sapi'],
+  ['glass of milk', 'susu-sapi']
 ]);
 
 const findFoodForLabel = (label) => {
-  // ImageNet labels can include comma-separated synonyms, e.g.
-  // "French loaf, bread, breadstuff". Check the canonical label first.
+  // ImageNet labels often include synonyms, e.g. "French loaf, bread, breadstuff".
   const normalizedLabels = [...new Set(String(label || '').split(',').map(normalize).filter(Boolean))];
   for (const normalizedLabel of normalizedLabels) {
     const catalogMatch = VERIFIED_FOODS.find((food) => {
@@ -69,16 +104,30 @@ const findFoodForLabel = (label) => {
   return undefined;
 };
 
-export const recognizeFoodInBrowser = async (imageDataUrl) => {
-  const imageBlob = await fetch(imageDataUrl).then((response) => response.blob());
-  const classifier = await getClassifier();
-  const predictions = await classifier(imageBlob, { topk: 5 });
-
-  // Choose the highest-ranked supported food class, not a generic object label.
+const findPrediction = (predictions, minimumScore) => {
   for (const prediction of predictions || []) {
     const food = findFoodForLabel(prediction.label);
-    if (food && prediction.score >= 0.08) return { food, score: prediction.score };
+    if (food && prediction.score >= minimumScore) return { food, score: prediction.score };
   }
-
   return null;
+};
+
+export const recognizeFoodInBrowser = async (imageDataUrl, onStage = () => {}) => {
+  const imageBlob = await fetch(imageDataUrl).then((response) => {
+    if (!response.ok) throw new Error('Foto tidak dapat disiapkan untuk pengenalan.');
+    return response.blob();
+  });
+
+  onStage('Mencocokkan foto dengan makanan dan minuman umum...');
+  const quickClassifier = await getClassifier(QUICK_MODEL);
+  const quickPredictions = await quickClassifier(imageBlob, { top_k: 10 });
+  const quickMatch = findPrediction(quickPredictions, 0.055);
+  if (quickMatch) return quickMatch;
+
+  // Food-101 adds a specialist pass for dishes outside the quick model's
+  // ImageNet labels. q4 keeps this fallback much smaller than the old CLIP.
+  onStage('Memperluas pencarian hidangan dengan model Food-101 (unduhan pertama sekitar 60 MB)...');
+  const foodClassifier = await getClassifier(FOOD_MODEL, { dtype: 'q4' });
+  const foodPredictions = await foodClassifier(imageBlob, { top_k: 10 });
+  return findPrediction(foodPredictions, 0.18);
 };
