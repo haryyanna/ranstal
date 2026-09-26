@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Camera, Sparkles, AlertTriangle, RotateCcw, Upload, SwitchCamera, ScanLine, Lightbulb, BookOpenCheck } from 'lucide-react';
 import { enqueueSheetsBackup } from '../lib/sheetsBackup';
 import { analyzeDrinkImage } from '../lib/nutriApi';
+import { recognizeFoodInBrowser } from '../lib/browserFoodRecognition';
 import { VERIFIED_FOODS, findVerifiedFood, normalizeFoodData } from '../../data/verifiedFoods';
 import './Scan.css';
 
@@ -35,9 +36,10 @@ const Scan = () => {
   const capturePhoto = () => {
     const video = videoRef.current, canvas = canvasRef.current;
     if (!video?.videoWidth || !canvas) return;
-    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+    const scale = Math.min(1, 1280 / Math.max(video.videoWidth, video.videoHeight));
+    canvas.width = Math.round(video.videoWidth * scale); canvas.height = Math.round(video.videoHeight * scale);
     canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-    setPhoto(canvas.toDataURL('image/jpeg', 0.88)); stopCamera(); setCameraState('preview');
+    setPhoto(canvas.toDataURL('image/jpeg', 0.82)); stopCamera(); setCameraState('preview');
   };
   const handleUpload = (event) => {
     const file = event.target.files?.[0]; if (!file) return;
@@ -48,7 +50,28 @@ const Scan = () => {
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => { setCameraError(''); setPhoto(String(reader.result)); stopCamera(); setCameraState('preview'); };
+    reader.onload = () => {
+      const image = new Image();
+      image.onload = () => {
+        const canvas = document.createElement('canvas');
+        const scale = Math.min(1, 1280 / Math.max(image.naturalWidth, image.naturalHeight));
+        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        const context = canvas.getContext('2d');
+        context.fillStyle = '#fff';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        setCameraError('');
+        setPhoto(canvas.toDataURL('image/jpeg', 0.82));
+        stopCamera();
+        setCameraState('preview');
+      };
+      image.onerror = () => {
+        setCameraError('Format foto tidak didukung browser ini. Simpan foto sebagai JPEG atau PNG, lalu pilih kembali.');
+        setCameraState('error');
+      };
+      image.src = String(reader.result);
+    };
     reader.onerror = () => { setCameraError('Foto tidak dapat dibaca. Silakan pilih file gambar lain.'); setCameraState('error'); };
     reader.readAsDataURL(file);
   };
@@ -90,11 +113,12 @@ const Scan = () => {
     setProgress(8);
     const steps = ['Mengirim foto dengan aman...', 'Mengenali makanan dan label...', 'Mencari data gizi dari database...', 'Menghitung ringkasan nutrisi...'];
     let index = 0;
+    let usingBrowserRecognition = false;
     setScanSteps(steps[index]);
 
     const timer = window.setInterval(() => {
       index = Math.min(index + 1, steps.length - 1);
-      setScanSteps(steps[index]);
+      if (!usingBrowserRecognition) setScanSteps(steps[index]);
       setProgress((value) => Math.min(value + 16, 88));
     }, 900);
 
@@ -103,6 +127,7 @@ const Scan = () => {
       const matchedFood = selectedFood || findVerifiedFood(selectedFoodId || 'makanan');
       let result = null;
       let analysisError = null;
+      let browserRecognition = null;
       try {
         result = await analyzeDrinkImage({
           imageB64: photo,
@@ -112,12 +137,22 @@ const Scan = () => {
       } catch (error) {
         analysisError = error;
       }
-      const valueToAnalyze = result?.result || matchedFood;
+      if (!result?.result && !matchedFood) {
+        try {
+          usingBrowserRecognition = true;
+          setScanSteps('Menyiapkan model pengenalan di perangkat (unduhan pertama bisa memerlukan waktu)...');
+          browserRecognition = await recognizeFoodInBrowser(photo);
+        } catch (error) {
+          console.warn('Pengenalan makanan di browser gagal:', error);
+        }
+      }
+      const valueToAnalyze = result?.result || matchedFood || browserRecognition?.food;
       if (!valueToAnalyze && analysisError) {
-        throw new Error(`Layanan scan belum tersedia (${analysisError.message}). Pilih jenis makanan di atas agar data gizi tetap dapat ditampilkan.`);
+        throw new Error(`Foto belum bisa dikenali otomatis. Server scan tidak tersedia (${analysisError.message}); pengenalan di perangkat juga tidak menemukan kecocokan yang cukup jelas. Pastikan koneksi internet aktif, atau pilih jenis makanan secara manual.`);
       }
       if (!valueToAnalyze) throw new Error('Makanan belum teridentifikasi. Pilih jenis makanan yang paling sesuai, lalu coba lagi.');
-      const food = normalizeFoodData({ ...valueToAnalyze, source: result?.source || 'Database Makanan Ranstal' });
+      const source = result?.source || (browserRecognition ? 'browser-vision-prediction' : 'Database Makanan Ranstal');
+      const food = normalizeFoodData({ ...valueToAnalyze, source });
 
       setScannedFood(food);
       setProgress(100);
@@ -277,7 +312,9 @@ const Scan = () => {
                   <strong>Mengapa diperiksa?</strong>
                   <p>{food.isFood === false
                     ? 'Objek yang dipindai tidak jelas sebagai makanan. Pastikan Anda memindai makanan yang aman dan sesuai untuk dikonsumsi.'
-                    : 'Makanan yang aman sangat penting untuk kesehatan anak selama perjalanan wisata. Ranstal membantu memastikan makanan yang dikonsumsi aman dan bernutrisi.'}</p>
+                    : food.source === 'browser-vision-prediction'
+                      ? 'Ini prediksi visual dari model di browser. Periksa nama makanan agar sesuai dengan foto sebelum memakai informasi gizinya.'
+                      : 'Makanan yang aman sangat penting untuk kesehatan anak selama perjalanan wisata. Ranstal membantu memastikan makanan yang dikonsumsi aman dan bernutrisi.'}</p>
                 </div>
               </div>
               <div className="scan-insight-item">
@@ -293,7 +330,7 @@ const Scan = () => {
                 {food.status}
               </span>
               <span className="result-badge secondary-badge">
-                {food.isFood === false ? 'Cek ulang' : 'Terverifikasi'}
+                {food.isFood === false ? 'Cek ulang' : food.source === 'browser-vision-prediction' ? 'Prediksi visual' : 'Terverifikasi'}
               </span>
             </div>
             <div className="grade-badge-row">
@@ -342,7 +379,7 @@ const Scan = () => {
         )}
       </div>
       <canvas ref={canvasRef} className="hidden-canvas" />
-      <input ref={inputRef} className="hidden-file-input" type="file" accept="image/*,.heic,.heif" onChange={handleUpload} />
+      <input ref={inputRef} className="hidden-file-input" type="file" accept="image/*" onChange={handleUpload} />
     </div>
   );
 };

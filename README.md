@@ -14,3 +14,9 @@ Untuk sinkron data lintas device (bukan localStorage per browser), lihat panduan
 ## Deploy Vercel
 
 Untuk checklist deploy lengkap (env + verifikasi), lihat `VERCEL_CHECKLIST.md`.
+
+## Deploy GitHub Pages tanpa backend
+
+Scan tetap dapat mengenali kandidat makanan tanpa Vercel melalui model visi yang berjalan di browser dan mencocokkan foto dengan katalog makanan lokal. Pada pemakaian pertama, browser mengunduh model dari Hugging Face (sekitar 190 MB); koneksi internet diperlukan. Setelah itu, foto diproses di perangkat. Hasil otomatis ditampilkan sebagai prediksi visual agar pengguna dapat memastikan nama makanan sebelum membaca nutrisinya. Kecocokan dapat lebih rendah untuk makanan yang tidak ada di katalog atau hidangan lokal yang jarang.
+
+Untuk menerbitkan ke URL GitHub Pages yang sama, buka `Settings -> Pages`, pilih `GitHub Actions` sebagai sumber deploy, lalu push ke branch `main`. Workflow `.github/workflows/pages.yml` akan build dan menerbitkan situs.
