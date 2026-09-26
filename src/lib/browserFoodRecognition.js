@@ -29,21 +29,44 @@ const normalize = (value) => String(value || '')
   .replace(/[^a-z0-9]+/g, ' ')
   .trim();
 
-const findFoodForLabel = (label) => {
-  const normalizedLabel = normalize(label);
-  if (!normalizedLabel) return undefined;
+// MobileViT uses ImageNet class names (for example, "French loaf"), which do
+// not always use the same wording as Ranstal's Indonesian food catalog.
+const MODEL_LABEL_FOOD_IDS = new Map([
+  ['loaf', 'roti-tawar'],
+  ['french loaf', 'roti-tawar'],
+  ['bread', 'roti-tawar'],
+  ['white bread', 'roti-tawar'],
+  ['sandwich bread', 'roti-tawar'],
+  ['sourdough', 'roti-tawar'],
+  ['bagel', 'roti-tawar'],
+  ['brown bread', 'roti-gandum'],
+  ['wholemeal bread', 'roti-gandum'],
+  ['wheat bread', 'roti-gandum'],
+  ['granny smith', 'apel'],
+  ['banana', 'pisang-ambon']
+]);
 
-  // Match a model label against the catalog's Indonesian and English names.
-  // Full phrase matches avoid mapping generic classes such as "plate" to food.
-  return VERIFIED_FOODS.find((food) => {
-    const terms = [food.name, ...(food.terms || []), ...(food.searchTerms || [])];
-    return terms.some((term) => {
-      const normalizedTerm = normalize(term);
-      return normalizedTerm === normalizedLabel
-        || normalizedTerm.startsWith(`${normalizedLabel} `)
-        || normalizedLabel.startsWith(`${normalizedTerm} `);
+const findFoodForLabel = (label) => {
+  // ImageNet labels can include comma-separated synonyms, e.g.
+  // "French loaf, bread, breadstuff". Check the canonical label first.
+  const normalizedLabels = [...new Set(String(label || '').split(',').map(normalize).filter(Boolean))];
+  for (const normalizedLabel of normalizedLabels) {
+    const catalogMatch = VERIFIED_FOODS.find((food) => {
+      const terms = [food.name, ...(food.terms || []), ...(food.searchTerms || [])];
+      return terms.some((term) => {
+        const normalizedTerm = normalize(term);
+        return normalizedTerm === normalizedLabel
+          || normalizedTerm.startsWith(`${normalizedLabel} `)
+          || normalizedLabel.startsWith(`${normalizedTerm} `);
+      });
     });
-  });
+
+    if (catalogMatch) return catalogMatch;
+    const mappedFoodId = MODEL_LABEL_FOOD_IDS.get(normalizedLabel);
+    if (mappedFoodId) return VERIFIED_FOODS.find((food) => food.id === mappedFoodId);
+  }
+
+  return undefined;
 };
 
 export const recognizeFoodInBrowser = async (imageDataUrl) => {
